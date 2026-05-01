@@ -12,14 +12,19 @@
 import "./config/migrate.js";
 
 import http from "http";
-import app from "./app.js";
+import app, { deployService, projectRepo } from "./app.js";
 import { env } from "./config/env.js";
 import logger from "./config/logger.js";
+import { scheduler } from "./config/scheduler.js";
 
 const server = http.createServer(app);
 
-server.listen(env.PORT, () => {
+server.listen(env.PORT, async () => {
   logger.info(`Server listening`, { port: env.PORT, env: env.NODE_ENV });
+
+  // Start cron scheduler after DB migrations have run
+  scheduler.init(deployService, projectRepo);
+  await scheduler.loadAll();
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────

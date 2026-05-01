@@ -75,15 +75,29 @@ const migrations = [
 ];
 
 // Run all migrations in a single transaction
-db.exec('BEGIN');
+db.exec("BEGIN");
 try {
   for (const sql of migrations) {
     db.exec(sql);
   }
-  db.exec('COMMIT');
+  db.exec("COMMIT");
 } catch (err) {
-  db.exec('ROLLBACK');
+  db.exec("ROLLBACK");
   throw err;
+}
+
+// ── Additive column migrations (run outside main transaction, ignore if exists) ──
+const alterMigrations = [
+  `ALTER TABLE projects ADD COLUMN cron_expression TEXT`,
+  `ALTER TABLE projects ADD COLUMN cron_enabled    INTEGER NOT NULL DEFAULT 0`,
+];
+
+for (const sql of alterMigrations) {
+  try {
+    db.exec(sql);
+  } catch {
+    // Column already exists — safe to ignore
+  }
 }
 
 logger.info("Migrations applied successfully");

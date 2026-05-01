@@ -12,6 +12,7 @@ import type { ProjectRepository } from "../repositories/ProjectRepository.js";
 import type { RepoRepository } from "../repositories/RepoRepository.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 import { cloneOrFetch, getDiffSummary } from "../utils/gitHelper.js";
+import { scheduler } from "../config/scheduler.js";
 
 export class ProjectService {
   private projectRepo: ProjectRepository;
@@ -116,5 +117,25 @@ export class ProjectService {
     );
 
     return results;
+  }
+
+  async updateCronConfig(
+    projectId: number,
+    userId: number,
+    {
+      cronExpression,
+      cronEnabled,
+    }: { cronExpression: string | null; cronEnabled: boolean },
+  ) {
+    const project = await this.getProject(projectId, userId);
+    if (project.owner_id !== userId)
+      throw new ForbiddenError("Only the owner can configure the schedule");
+
+    const updated = await this.projectRepo.updateCron(projectId, {
+      cronExpression,
+      cronEnabled,
+    });
+    if (updated) scheduler.upsertJob(updated);
+    return updated;
   }
 }

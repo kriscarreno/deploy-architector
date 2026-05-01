@@ -180,4 +180,5 @@ app.use((_req, res) =>
 // ── Centralised error handler (must be last) ──────────────────────────────
 app.use(errorHandler);
 
+export { deployService, projectRepo };
 export default app;

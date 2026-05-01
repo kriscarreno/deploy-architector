@@ -7,6 +7,7 @@
  */
 import Joi from "joi";
 import { ValidationError } from "../utils/errors.js";
+import { scheduler } from "../config/scheduler.js";
 
 // ── Validation schemas ────────────────────────────────────────────────────
 
@@ -20,6 +21,11 @@ const updateProjectSchema = Joi.object({
   name: Joi.string().trim().min(1).max(100),
   description: Joi.string().trim().max(500).allow("", null),
   atomic: Joi.boolean(),
+});
+
+const updateCronSchema = Joi.object({
+  cron_expression: Joi.string().allow(null, "").default(null),
+  cron_enabled: Joi.boolean().required(),
 });
 
 // Accepts the frontend's field names (snake_case) and maps to repo schema
@@ -164,6 +170,29 @@ export function makeProjectController(projectService) {
         req.user.access_token,
       );
       res.json({ data: diffs });
+    },
+
+    async updateCronConfig(req, res) {
+      const data = validate(updateCronSchema, req.body);
+
+      // Validate cron expression format when providing one
+      if (data.cron_enabled && data.cron_expression) {
+        if (!scheduler.validate(data.cron_expression)) {
+          throw new ValidationError("Invalid cron expression", [
+            "La expresión cron no es válida. Usa formato: minuto hora día-mes mes día-semana",
+          ]);
+        }
+      }
+
+      const project = await projectService.updateCronConfig(
+        Number(req.params.id),
+        req.user.id,
+        {
+          cronExpression: data.cron_expression || null,
+          cronEnabled: data.cron_enabled,
+        },
+      );
+      res.json({ data: project });
     },
   };
 }

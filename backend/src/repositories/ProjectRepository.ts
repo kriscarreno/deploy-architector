@@ -127,4 +127,30 @@ export class ProjectRepository {
       )
       .all(projectId);
   }
+
+  async updateCron(
+    projectId: number,
+    {
+      cronExpression,
+      cronEnabled,
+    }: { cronExpression: string | null; cronEnabled: boolean },
+  ): Promise<Project | null> {
+    db.prepare(
+      `UPDATE projects
+          SET cron_expression = ?,
+              cron_enabled    = ?,
+              updated_at      = datetime('now')
+        WHERE id = ?`,
+    ).run(cronExpression ?? null, cronEnabled ? 1 : 0, projectId);
+    return this.findById(projectId);
+  }
+
+  /** Returns all projects that have an active cron schedule. */
+  async findAllCronEnabled(): Promise<Project[]> {
+    return db
+      .prepare(
+        `SELECT * FROM projects WHERE cron_enabled = 1 AND cron_expression IS NOT NULL`,
+      )
+      .all() as unknown as Project[];
+  }
 }

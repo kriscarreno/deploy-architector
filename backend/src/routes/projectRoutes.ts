@@ -39,6 +39,7 @@ export function makeProjectRouter(projectCtrl, deployCtrl) {
   router.delete("/:id/repos/:repoId", asyncHandler(projectCtrl.deleteRepo));
 
   router.get("/:id/diff", asyncHandler(projectCtrl.getProjectDiff));
+  router.put("/:id/cron", asyncHandler(projectCtrl.updateCronConfig));
   router.post("/:id/deploy", asyncHandler(deployCtrl.enqueueDeploy));
   router.get("/:id/deploys", asyncHandler(deployCtrl.getDeployHistory));
 

@@ -33,6 +33,8 @@ export interface Project {
   name: string;
   description: string | null;
   atomic: number;
+  cron_expression: string | null;
+  cron_enabled: number;
   created_at: string;
   updated_at: string;
   repos?: Repo[];

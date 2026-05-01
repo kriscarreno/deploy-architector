@@ -23,6 +23,10 @@ export interface Project {
   description: string | null;
   /** SQLite stores booleans as 0/1 */
   atomic: number;
+  /** node-cron expression, e.g. "0 2 * * *" */
+  cron_expression: string | null;
+  /** SQLite boolean: 1 = enabled */
+  cron_enabled: number;
   created_at: string;
   updated_at: string;
   /** Only present in list queries (COUNT subquery) */

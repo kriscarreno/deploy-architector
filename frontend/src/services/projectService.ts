@@ -88,17 +88,27 @@ const projectService = {
    * @param {string|number} projectId
    */
   getDiff(projectId) {
+    return apiClient.get(`/api/projects/${projectId}/diff`).then(
+      (r) =>
+        r.data.data as Array<{
+          repoId: number;
+          name: string;
+          diff: string;
+          upToDate: boolean;
+        }>,
+    );
+  },
+
+  /**
+   * Guarda la configuración de despliegue programado del proyecto.
+   */
+  updateCron(
+    projectId: number | string,
+    payload: { cron_expression: string | null; cron_enabled: boolean },
+  ) {
     return apiClient
-      .get(`/api/projects/${projectId}/diff`)
-      .then(
-        (r) =>
-          r.data.data as Array<{
-            repoId: number;
-            name: string;
-            diff: string;
-            upToDate: boolean;
-          }>,
-      );
+      .put(`/api/projects/${projectId}/cron`, payload)
+      .then((r) => r.data.data);
   },
 };
 
