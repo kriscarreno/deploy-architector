@@ -1,9 +1,10 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import useProjects from "../hooks/useProjects";
 import useToast from "../hooks/useToast";
 import deployService from "../services/deployService";
+import configService from "../services/configService";
 import { getErrorMessage } from "../utils/errorHandler";
 import Button from "../components/common/Button";
 import Modal from "../components/common/Modal";
@@ -165,9 +166,47 @@ function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [history, setHistory] = useState<DeployJob[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const { projects, loading: projectsLoading, createProject } = useProjects();
-  const { toastError } = useToast();
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const {
+    projects,
+    loading: projectsLoading,
+    createProject,
+    refresh: refreshProjects,
+  } = useProjects();
+  const { toastError, toastSuccess } = useToast();
   const navigate = useNavigate();
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await configService.downloadExport();
+    } catch (err: unknown) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so the same file can be re-imported if needed
+    e.target.value = "";
+    setImporting(true);
+    try {
+      const result = await configService.importFromFile(file);
+      toastSuccess(
+        `Importados ${result.imported} proyecto${result.imported !== 1 ? "s" : ""} correctamente.`,
+      );
+      await refreshProjects();
+    } catch (err: unknown) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +264,29 @@ function DashboardPage() {
           <p className="mt-1 text-sm text-slate-400">Resumen de actividad</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            loading={exporting}
+            title="Exportar configuración de proyectos"
+          >
+            Exportar
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => importInputRef.current?.click()}
+            loading={importing}
+            title="Importar configuración desde un archivo JSON"
+          >
+            Importar
+          </Button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
           <Button variant="secondary" onClick={() => navigate("/projects")}>
             Ver proyectos
           </Button>

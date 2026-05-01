@@ -18,9 +18,16 @@ import { asyncHandler } from "../middlewares/asyncHandler.js";
 const router = Router();
 router.use(requireAuth);
 
-// ── Simple in-memory cache (user_id → {ts, data}) ────────────────────────
-const cache = new Map<number, { ts: number; data: GithubRepo[] }>();
-const TTL = 60_000; // 60 s
+// ── In-memory caches ──────────────────────────────────────────────────────
+const listCache = new Map<number, { ts: number; data: GithubRepo[] }>();
+const LIST_TTL = 60_000; // 60 s
+
+// Search cache: user_id → Map<query, {ts, data}>
+const searchCache = new Map<
+  number,
+  Map<string, { ts: number; data: GithubRepo[] }>
+>();
+const SEARCH_TTL = 30_000; // 30 s
 
 interface GithubRepo {
   id: number;
@@ -32,70 +39,98 @@ interface GithubRepo {
   pushed_at: string | null;
 }
 
+interface GithubSearchResponse {
+  items: GithubRepo[];
+}
+
+const GITHUB_HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
+/** Lists repos the user has access to (up to 1000, sorted by last push). */
 async function fetchGithubRepos(token: string): Promise<GithubRepo[]> {
   const perPage = 100;
-  let page = 1;
   const all: GithubRepo[] = [];
+  let page = 1;
 
-  while (true) {
+  while (page <= 10) {
     const res = await fetch(
       `https://api.github.com/user/repos?per_page=${perPage}&page=${page}&sort=pushed&affiliation=owner,collaborator,organization_member`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      },
+      { headers: GITHUB_HEADERS(token) },
     );
-
     if (!res.ok) break;
-
     const batch = (await res.json()) as GithubRepo[];
     if (batch.length === 0) break;
-
     all.push(...batch);
-
-    // Stop if we got less than a full page (last page)
     if (batch.length < perPage) break;
-
-    // Cap at 5 pages (500 repos) to avoid very slow responses
-    if (page >= 5) break;
-
     page++;
   }
 
   return all;
 }
 
+/**
+ * Searches GitHub repositories using the Search API.
+ * The token grants access to private repos the user owns/collaborates on.
+ */
+async function searchGithubRepos(
+  token: string,
+  q: string,
+): Promise<GithubRepo[]> {
+  const res = await fetch(
+    `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&per_page=30&sort=updated`,
+    { headers: GITHUB_HEADERS(token) },
+  );
+  if (!res.ok) return [];
+  const body = (await res.json()) as GithubSearchResponse;
+  return body.items ?? [];
+}
+
 router.get(
   "/repos",
   asyncHandler(async (req, res) => {
     const user = req.user as Express.User;
-    const q = ((req.query.q as string) ?? "").toLowerCase().trim();
+    const q = ((req.query.q as string) ?? "").trim();
 
-    // Serve from cache if fresh
-    const cached = cache.get(user.id);
     let repos: GithubRepo[];
 
-    if (cached && Date.now() - cached.ts < TTL) {
-      repos = cached.data;
+    if (q.length >= 2) {
+      // Use GitHub Search API — searches accessible repos by keyword
+      const userMap =
+        searchCache.get(user.id) ??
+        new Map<string, { ts: number; data: GithubRepo[] }>();
+      const cached = userMap.get(q);
+
+      if (cached && Date.now() - cached.ts < SEARCH_TTL) {
+        repos = cached.data;
+      } else {
+        repos = await searchGithubRepos(user.access_token, q);
+        userMap.set(q, { ts: Date.now(), data: repos });
+        searchCache.set(user.id, userMap);
+      }
     } else {
-      repos = await fetchGithubRepos(user.access_token);
-      cache.set(user.id, { ts: Date.now(), data: repos });
+      // No query — return recently-pushed repos from the user's list
+      const cached = listCache.get(user.id);
+      if (cached && Date.now() - cached.ts < LIST_TTL) {
+        repos = cached.data;
+      } else {
+        repos = await fetchGithubRepos(user.access_token);
+        listCache.set(user.id, { ts: Date.now(), data: repos });
+      }
+      // Narrow by single char if provided
+      if (q.length === 1) {
+        const term = q.toLowerCase();
+        repos = repos.filter(
+          (r) =>
+            r.full_name.toLowerCase().includes(term) ||
+            (r.description ?? "").toLowerCase().includes(term),
+        );
+      }
     }
 
-    // Filter by query (matches name or description)
-    const filtered = q
-      ? repos.filter(
-          (r) =>
-            r.full_name.toLowerCase().includes(q) ||
-            (r.description ?? "").toLowerCase().includes(q),
-        )
-      : repos;
-
-    // Return max 20 suggestions
-    res.json({ data: filtered.slice(0, 20) });
+    res.json({ data: repos.slice(0, 30) });
   }),
 );
 

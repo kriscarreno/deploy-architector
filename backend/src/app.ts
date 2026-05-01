@@ -43,6 +43,7 @@ import authRoutes from "./routes/authRoutes.js";
 import { makeProjectRouter } from "./routes/projectRoutes.js";
 import { makeJobRouter } from "./routes/jobRoutes.js";
 import githubRoutes from "./routes/githubRoutes.js";
+import { makeConfigRouter } from "./routes/configRoutes.js";
 
 // Middlewares
 import { correlationId } from "./middlewares/correlationId.js";
@@ -166,6 +167,7 @@ app.use("/auth", authRoutes);
 app.use("/api/projects", makeProjectRouter(projectCtrl, deployCtrl));
 app.use("/api/jobs", makeJobRouter(deployCtrl));
 app.use("/api/github", githubRoutes);
+app.use("/api/config", makeConfigRouter(projectRepo, repoRepo));
 
 // ── Health check (no auth) ────────────────────────────────────────────────
 app.get("/health", (_req, res) =>

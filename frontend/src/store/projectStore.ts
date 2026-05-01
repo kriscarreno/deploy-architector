@@ -18,6 +18,10 @@ interface ProjectState {
     name: string;
     description?: string;
   }) => Promise<Project>;
+  updateProject: (
+    id: string,
+    payload: { name: string; description?: string },
+  ) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
   addRepo: (projectId: string, payload: unknown) => Promise<void>;
   removeRepo: (projectId: string, repoId: string) => Promise<void>;
@@ -72,10 +76,20 @@ const useProjectStore = create<ProjectState>((set, get) => ({
     return project;
   },
 
-  /**
-   * Elimina un proyecto del estado y del backend.
-   * @param {string} id
-   */
+  updateProject: async (id: string, payload) => {
+    const updated = await projectService.update(id, payload);
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === Number(id) ? { ...p, ...updated } : p,
+      ),
+      selectedProject:
+        state.selectedProject?.id === Number(id)
+          ? { ...state.selectedProject, ...updated }
+          : state.selectedProject,
+    }));
+    return updated;
+  },
+
   deleteProject: async (id: string) => {
     await projectService.delete(id);
     set((state) => ({

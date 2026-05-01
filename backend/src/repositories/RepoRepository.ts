@@ -91,4 +91,14 @@ export class RepoRepository {
   async delete(repoId: number): Promise<void> {
     db.prepare("DELETE FROM repos WHERE id = ?").run(repoId);
   }
+
+  /** Returns MAX(order_index) + 1 for the project, or 1 if no repos exist yet. */
+  nextOrderIndex(projectId: number): number {
+    const row = db
+      .prepare(
+        "SELECT COALESCE(MAX(order_index), 0) + 1 AS next FROM repos WHERE project_id = ?",
+      )
+      .get(projectId) as { next: number };
+    return row.next;
+  }
 }

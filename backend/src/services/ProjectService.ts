@@ -52,7 +52,15 @@ export class ProjectService {
 
   async addRepo(projectId, userId, data) {
     await this.getProject(projectId, userId); // ensures access
-    return this.repoRepo.create({ projectId, ...data });
+
+    // Auto-assign next available order index to prevent duplicates
+    const nextOrder = this.repoRepo.nextOrderIndex(projectId);
+    const orderIndex =
+      data.orderIndex == null || data.orderIndex === 0
+        ? nextOrder
+        : data.orderIndex;
+
+    return this.repoRepo.create({ projectId, ...data, orderIndex });
   }
 
   async getProjectWithRepos(projectId, userId) {

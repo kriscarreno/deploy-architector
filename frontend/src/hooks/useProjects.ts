@@ -17,6 +17,7 @@ function useProjects() {
     error,
     fetchProjects,
     createProject: storeCreate,
+    updateProject: storeUpdate,
     deleteProject: storeDelete,
   } = useProjectStore();
   const { toastError, toastSuccess } = useToast();
@@ -40,6 +41,20 @@ function useProjects() {
     }
   };
 
+  const updateProject = async (
+    id: string,
+    payload: { name: string; description?: string },
+  ) => {
+    try {
+      const project = await storeUpdate(id, payload);
+      toastSuccess(`Proyecto "${project.name}" actualizado`);
+      return project;
+    } catch (err) {
+      toastError(getErrorMessage(err));
+      throw err;
+    }
+  };
+
   const deleteProject = async (id) => {
     try {
       await storeDelete(id);
@@ -54,6 +69,7 @@ function useProjects() {
     projects,
     loading,
     createProject,
+    updateProject,
     deleteProject,
     refresh: fetchProjects,
   };

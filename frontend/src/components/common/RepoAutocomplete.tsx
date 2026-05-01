@@ -1,16 +1,14 @@
 /**
  * RepoAutocomplete
  *
- * Text input that:
- * 1. On focus / first keystroke fetches all repos from the backend
- *    (cached 60 s server-side, also cached in component state).
- * 2. Filters suggestions as the user types.
- * 3. On selection fills in the clone_url and calls onSelect with a
- *    { url, mainBranch?, prodBranch? } payload so the parent form can
- *    prefill the branch fields (GitHub API doesn't give branches, so
- *    we just pass the URL and keep branches at their defaults).
+ * Text input with GitHub repo suggestions.
+ * - On focus: fetches recent repos (q="") from the backend.
+ * - While typing: debounces 300 ms then fetches with the actual query.
+ *   When q >= 2 chars the backend uses GitHub Search API (finds any
+ *   accessible repo, including orgs/collaborations).
+ * - Results come directly from the backend — no local filtering cap.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import githubService, {
   type GithubRepoSuggestion,
 } from "../../services/githubService";
@@ -21,44 +19,46 @@ interface Props {
   error?: string;
 }
 
+const DEBOUNCE_MS = 300;
+
 export default function RepoAutocomplete({ value, onChange, error }: Props) {
   const [suggestions, setSuggestions] = useState<GithubRepoSuggestion[]>([]);
-  const [allRepos, setAllRepos] = useState<GithubRepoSuggestion[] | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Abort stale requests: track latest call id
+  const callIdRef = useRef(0);
 
-  // Load full repo list once on first focus
-  const loadRepos = async () => {
-    if (allRepos !== null) return; // already loaded
+  const fetchSuggestions = useCallback(async (q: string) => {
+    const id = ++callIdRef.current;
     setLoading(true);
     try {
-      const repos = await githubService.searchRepos("");
-      setAllRepos(repos);
-      setSuggestions(filter(repos, value));
+      const repos = await githubService.searchRepos(q);
+      if (id !== callIdRef.current) return; // stale
+      setSuggestions(repos);
     } catch {
-      setAllRepos([]);
+      if (id !== callIdRef.current) return;
+      setSuggestions([]);
     } finally {
-      setLoading(false);
+      if (id === callIdRef.current) setLoading(false);
     }
-  };
-
-  const filter = (repos: GithubRepoSuggestion[], q: string) => {
-    const term = q.toLowerCase();
-    return repos
-      .filter(
-        (r) =>
-          r.full_name.toLowerCase().includes(term) ||
-          (r.description ?? "").toLowerCase().includes(term),
-      )
-      .slice(0, 10);
-  };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     onChange(v);
-    if (allRepos) setSuggestions(filter(allRepos, v));
     setOpen(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(v), DEBOUNCE_MS);
+  };
+
+  const handleFocus = () => {
+    setOpen(true);
+    // Only load initial list if we haven't fetched anything yet
+    if (suggestions.length === 0 && !loading) {
+      fetchSuggestions(value);
+    }
   };
 
   const handleSelect = (repo: GithubRepoSuggestion) => {
@@ -80,6 +80,14 @@ export default function RepoAutocomplete({ value, onChange, error }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Cleanup debounce on unmount
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
+
   const showDropdown = open && (loading || suggestions.length > 0);
 
   return (
@@ -98,10 +106,7 @@ export default function RepoAutocomplete({ value, onChange, error }: Props) {
           autoComplete="off"
           value={value}
           onChange={handleChange}
-          onFocus={() => {
-            setOpen(true);
-            loadRepos();
-          }}
+          onFocus={handleFocus}
           placeholder="https://github.com/org/repo.git  o busca tu repo…"
           aria-invalid={Boolean(error)}
           aria-describedby={error ? "git-url-error" : undefined}

@@ -72,7 +72,17 @@ function RepoFormFields({ register, errors, control }) {
 }
 
 // Modal: añadir repositorio
-function AddRepoModal({ isOpen, onClose, onSubmit }) {
+function AddRepoModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  nextOrder,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+  nextOrder: number;
+}) {
   const {
     register,
     handleSubmit,
@@ -84,9 +94,21 @@ function AddRepoModal({ isOpen, onClose, onSubmit }) {
       git_url: "",
       main_branch: "main",
       production_branch: "production",
-      order: 1,
+      order: nextOrder,
     },
   });
+
+  // Re-sync default when nextOrder changes (modal re-opens)
+  useEffect(() => {
+    if (isOpen)
+      reset({
+        git_url: "",
+        main_branch: "main",
+        production_branch: "production",
+        order: nextOrder,
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, nextOrder]);
 
   const submit = async (data) => {
     await onSubmit({ ...data, order: Number(data.order) });
@@ -741,6 +763,7 @@ function ProjectDetailPage() {
         isOpen={addRepoOpen}
         onClose={() => setAddRepoOpen(false)}
         onSubmit={handleAddRepo}
+        nextOrder={(project.repos?.length ?? 0) + 1}
       />
       <EditRepoModal
         isOpen={Boolean(editRepo)}

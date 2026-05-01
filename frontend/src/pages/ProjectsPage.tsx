@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import useProjects from "../hooks/useProjects";
@@ -18,9 +18,13 @@ interface CreateProjectForm {
 const ProjectCard = memo(function ProjectCard({
   project,
   onClick,
+  onEdit,
+  onDelete,
 }: {
   project: Project;
   onClick: () => void;
+  onEdit: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
 }) {
   return (
     <article
@@ -31,7 +35,7 @@ const ProjectCard = memo(function ProjectCard({
       className="card cursor-pointer transition-all hover:border-primary-600 hover:shadow-primary-900/20 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary-500"
       aria-label={`Abrir proyecto ${project.name}`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold text-white">
             {project.name}
@@ -42,15 +46,43 @@ const ProjectCard = memo(function ProjectCard({
             </p>
           )}
         </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="ml-3 h-5 w-5 flex-shrink-0 text-slate-600"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
-        </svg>
+        {/* Action buttons — stop propagation so card click doesn't trigger */}
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Editar proyecto"
+            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-dark-border hover:text-white"
+            aria-label="Editar proyecto"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            title="Eliminar proyecto"
+            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-red-900/40 hover:text-red-400"
+            aria-label="Eliminar proyecto"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
@@ -75,6 +107,131 @@ const ProjectCard = memo(function ProjectCard({
     </article>
   );
 });
+
+// ── Modal editar proyecto ─────────────────────────────────────────────────
+function EditProjectModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  project,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateProjectForm) => Promise<unknown>;
+  project: Project | null;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateProjectForm>();
+
+  useEffect(() => {
+    if (isOpen && project) {
+      reset({ name: project.name, description: project.description ?? "" });
+    }
+  }, [isOpen, project, reset]);
+
+  const submit = async (data: CreateProjectForm) => {
+    await onSubmit(data);
+    onClose();
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Editar proyecto"
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="edit-project-form" loading={isSubmitting}>
+            Guardar cambios
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="edit-project-form"
+        onSubmit={handleSubmit(submit)}
+        noValidate
+        className="flex flex-col gap-4"
+      >
+        <Input
+          id="edit-project-name"
+          label="Nombre"
+          required
+          placeholder="mi-proyecto"
+          error={errors.name?.message as string | undefined}
+          {...register("name", projectNameRules)}
+        />
+        <Input
+          id="edit-project-description"
+          label="Descripción"
+          placeholder="Descripción opcional"
+          error={errors.description?.message as string | undefined}
+          {...register("description", {
+            maxLength: { value: 200, message: "Máximo 200 caracteres" },
+          })}
+        />
+      </form>
+    </Modal>
+  );
+}
+
+// ── Modal confirmar eliminación ───────────────────────────────────────────
+function DeleteConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  project,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  project: Project | null;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Eliminar proyecto"
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirm} loading={loading}>
+            Eliminar
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-slate-300">
+        ¿Estás seguro de que quieres eliminar el proyecto{" "}
+        <span className="font-semibold text-white">{project?.name}</span>? Esta
+        acción no se puede deshacer.
+      </p>
+    </Modal>
+  );
+}
 
 // ── Modal crear proyecto ──────────────────────────────────────────────────
 function CreateProjectModal({
@@ -159,9 +316,27 @@ function CreateProjectModal({
 // ── Projects Page ─────────────────────────────────────────────────────────
 function ProjectsPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [deleteProject, setDeleteProject] = useState<Project | null>(null);
   const [search, setSearch] = useState("");
-  const { projects, loading, createProject } = useProjects();
+  const {
+    projects,
+    loading,
+    createProject,
+    updateProject,
+    deleteProject: doDelete,
+  } = useProjects();
   const navigate = useNavigate();
+
+  const handleEdit = async (data: CreateProjectForm) => {
+    if (!editProject) return;
+    await updateProject(String(editProject.id), data);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteProject) return;
+    await doDelete(String(deleteProject.id));
+  };
 
   const filtered = search.trim()
     ? projects.filter(
@@ -231,6 +406,14 @@ function ProjectsPage() {
               key={p.id}
               project={p}
               onClick={() => navigate(`/projects/${p.id}`)}
+              onEdit={(e) => {
+                e.stopPropagation();
+                setEditProject(p);
+              }}
+              onDelete={(e) => {
+                e.stopPropagation();
+                setDeleteProject(p);
+              }}
             />
           ))}
         </div>
@@ -240,6 +423,18 @@ function ProjectsPage() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSubmit={createProject}
+      />
+      <EditProjectModal
+        isOpen={Boolean(editProject)}
+        onClose={() => setEditProject(null)}
+        onSubmit={handleEdit}
+        project={editProject}
+      />
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteProject)}
+        onClose={() => setDeleteProject(null)}
+        onConfirm={handleDelete}
+        project={deleteProject}
       />
     </section>
   );
