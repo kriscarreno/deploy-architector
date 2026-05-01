@@ -34,6 +34,8 @@ const addRepoSchema = Joi.object({
   main_branch: Joi.string().default("main"),
   production_branch: Joi.string().default("production"),
   order: Joi.number().integer().min(0).default(0),
+  main_url: Joi.string().uri().allow("", null).default(null),
+  prod_url: Joi.string().uri().allow("", null).default(null),
 });
 
 const updateRepoSchema = Joi.object({
@@ -41,6 +43,8 @@ const updateRepoSchema = Joi.object({
   main_branch: Joi.string(),
   production_branch: Joi.string(),
   order: Joi.number().integer().min(0),
+  main_url: Joi.string().uri().allow("", null),
+  prod_url: Joi.string().uri().allow("", null),
 });
 
 function validate(schema, data) {
@@ -103,6 +107,8 @@ export function makeProjectController(projectService) {
           mainBranch: data.main_branch,
           prodBranch: data.production_branch,
           orderIndex: data.order,
+          mainUrl: data.main_url ?? null,
+          prodUrl: data.prod_url ?? null,
         },
       );
       res.status(201).json({ data: repo });
@@ -158,9 +164,61 @@ export function makeProjectController(projectService) {
           mainBranch: data.main_branch,
           prodBranch: data.production_branch,
           orderIndex: data.order,
+          mainUrl: "main_url" in data ? (data.main_url ?? null) : undefined,
+          prodUrl: "prod_url" in data ? (data.prod_url ?? null) : undefined,
         },
       );
       res.json({ data: repo });
+    },
+
+    async getProjectStatus(req, res) {
+      const TIMEOUT_MS = 8000;
+      const repos = await projectService.listRepos(
+        Number(req.params.id),
+        req.user.id,
+      );
+
+      const checkUrl = async (url: string | null) => {
+        if (!url)
+          return { url: null, up: null, latencyMs: null, statusCode: null };
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        const start = Date.now();
+        try {
+          const resp = await fetch(url, {
+            method: "GET",
+            signal: controller.signal,
+            redirect: "follow",
+          });
+          const latencyMs = Date.now() - start;
+          return {
+            url,
+            up: resp.status < 500,
+            latencyMs,
+            statusCode: resp.status,
+          };
+        } catch {
+          return {
+            url,
+            up: false,
+            latencyMs: Date.now() - start,
+            statusCode: null,
+          };
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      const results = await Promise.all(
+        repos.map(async (repo) => ({
+          repoId: repo.id,
+          name: repo.name,
+          main: await checkUrl(repo.main_url ?? null),
+          prod: await checkUrl(repo.prod_url ?? null),
+        })),
+      );
+
+      res.json({ data: results });
     },
 
     async getProjectDiff(req, res) {

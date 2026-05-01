@@ -22,6 +22,8 @@ export interface Repo {
   order_index: number;
   prod_branch: string;
   main_branch: string;
+  main_url: string | null;
+  prod_url: string | null;
   local_path: string | null;
   created_at: string;
   updated_at: string;
@@ -57,4 +59,17 @@ export interface DeployJob {
   currentRepo?: string;
   logs?: string[];
   progress?: number;
+}
+
+export type EnvBranch = "main" | "production";
+
+export interface EnvVar {
+  id: number;
+  repo_id: number;
+  branch: EnvBranch;
+  key: string;
+  value: string;
+  is_secret: number; // 0 | 1
+  created_at: string;
+  updated_at: string;
 }

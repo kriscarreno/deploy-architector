@@ -26,10 +26,12 @@ import { UserRepository } from "./repositories/UserRepository.js";
 import { ProjectRepository } from "./repositories/ProjectRepository.js";
 import { RepoRepository } from "./repositories/RepoRepository.js";
 import { DeployLogRepository } from "./repositories/DeployLogRepository.js";
+import { EnvVarRepository } from "./repositories/EnvVarRepository.js";
 
 // Services
 import { ProjectService } from "./services/ProjectService.js";
 import { DeployService } from "./services/DeployService.js";
+import { EnvVarService } from "./services/EnvVarService.js";
 
 // Queue
 import { deployQueue } from "./queues/deployQueue.js";
@@ -37,6 +39,7 @@ import { deployQueue } from "./queues/deployQueue.js";
 // Controllers
 import { makeProjectController } from "./controllers/projectController.js";
 import { makeDeployController } from "./controllers/deployController.js";
+import { makeEnvVarController } from "./controllers/envVarController.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -44,6 +47,7 @@ import { makeProjectRouter } from "./routes/projectRoutes.js";
 import { makeJobRouter } from "./routes/jobRoutes.js";
 import githubRoutes from "./routes/githubRoutes.js";
 import { makeConfigRouter } from "./routes/configRoutes.js";
+import { makeEnvVarRouter } from "./routes/envVarRoutes.js";
 
 // Middlewares
 import { correlationId } from "./middlewares/correlationId.js";
@@ -55,6 +59,7 @@ const userRepo = new UserRepository();
 const projectRepo = new ProjectRepository();
 const repoRepo = new RepoRepository();
 const deployLogRepo = new DeployLogRepository();
+const envVarRepo = new EnvVarRepository();
 
 // ── Configure Passport (inject userRepo) ──────────────────────────────────
 configurePassport(userRepo);
@@ -66,10 +71,12 @@ const deployService = new DeployService(
   deployLogRepo,
   deployQueue,
 );
+const envVarService = new EnvVarService(envVarRepo, repoRepo, projectRepo);
 
 // ── Instantiate controllers ───────────────────────────────────────────────
 const projectCtrl = makeProjectController(projectService);
 const deployCtrl = makeDeployController(deployService);
+const envVarCtrl = makeEnvVarController(envVarService);
 
 // ── Build Express app ─────────────────────────────────────────────────────
 const app = express();
@@ -165,6 +172,7 @@ if (env.NODE_ENV !== "production") {
 // ── Routes ────────────────────────────────────────────────────────────────
 app.use("/auth", authRoutes);
 app.use("/api/projects", makeProjectRouter(projectCtrl, deployCtrl));
+app.use("/api/projects/:id/repos/:repoId/env", makeEnvVarRouter(envVarCtrl));
 app.use("/api/jobs", makeJobRouter(deployCtrl));
 app.use("/api/github", githubRoutes);
 app.use("/api/config", makeConfigRouter(projectRepo, repoRepo));

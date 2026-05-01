@@ -13,6 +13,8 @@ type CreatePayload = {
   orderIndex?: number;
   prodBranch?: string;
   mainBranch?: string;
+  mainUrl?: string | null;
+  prodUrl?: string | null;
 };
 
 type UpdatePayload = {
@@ -21,6 +23,8 @@ type UpdatePayload = {
   mainBranch?: string;
   prodBranch?: string;
   orderIndex?: number;
+  mainUrl?: string | null;
+  prodUrl?: string | null;
 };
 
 export class RepoRepository {
@@ -47,20 +51,39 @@ export class RepoRepository {
     orderIndex = 0,
     prodBranch = "production",
     mainBranch = "main",
+    mainUrl = null,
+    prodUrl = null,
   }: CreatePayload): Promise<Repo | null> {
     const result = db
       .prepare(
-        `INSERT INTO repos (project_id, github_url, name, order_index, prod_branch, main_branch)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO repos (project_id, github_url, name, order_index, prod_branch, main_branch, main_url, prod_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(projectId, githubUrl, name, orderIndex, prodBranch, mainBranch);
+      .run(
+        projectId,
+        githubUrl,
+        name,
+        orderIndex,
+        prodBranch,
+        mainBranch,
+        mainUrl,
+        prodUrl,
+      );
 
     return this.findById(Number(result.lastInsertRowid));
   }
 
   async update(
     repoId: number,
-    { githubUrl, name, mainBranch, prodBranch, orderIndex }: UpdatePayload,
+    {
+      githubUrl,
+      name,
+      mainBranch,
+      prodBranch,
+      orderIndex,
+      mainUrl,
+      prodUrl,
+    }: UpdatePayload,
   ): Promise<Repo | null> {
     db.prepare(
       `UPDATE repos
@@ -68,7 +91,9 @@ export class RepoRepository {
               name         = COALESCE(?, name),
               main_branch  = COALESCE(?, main_branch),
               prod_branch  = COALESCE(?, prod_branch),
-              order_index  = COALESCE(?, order_index)
+              order_index  = COALESCE(?, order_index),
+              main_url     = IIF(? IS NOT NULL, ?, main_url),
+              prod_url     = IIF(? IS NOT NULL, ?, prod_url)
         WHERE id = ?`,
     ).run(
       githubUrl ?? null,
@@ -76,6 +101,11 @@ export class RepoRepository {
       mainBranch ?? null,
       prodBranch ?? null,
       orderIndex ?? null,
+      // IIF sentinel: pass a non-null flag only when caller explicitly set the field
+      mainUrl !== undefined ? 1 : null,
+      mainUrl !== undefined ? mainUrl : null,
+      prodUrl !== undefined ? 1 : null,
+      prodUrl !== undefined ? prodUrl : null,
       repoId,
     );
     return this.findById(repoId);

@@ -110,6 +110,31 @@ const projectService = {
       .put(`/api/projects/${projectId}/cron`, payload)
       .then((r) => r.data.data);
   },
+
+  /**
+   * Obtiene el estado (ping) de todas las URLs de despliegue del proyecto.
+   */
+  getStatus(projectId: number | string) {
+    return apiClient.get(`/api/projects/${projectId}/status`).then(
+      (r) =>
+        r.data.data as Array<{
+          repoId: number;
+          name: string;
+          main: {
+            url: string | null;
+            up: boolean | null;
+            latencyMs: number | null;
+            statusCode: number | null;
+          };
+          prod: {
+            url: string | null;
+            up: boolean | null;
+            latencyMs: number | null;
+            statusCode: number | null;
+          };
+        }>,
+    );
+  },
 };
 
 export default projectService;

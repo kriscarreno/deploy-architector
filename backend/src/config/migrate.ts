@@ -72,6 +72,18 @@ const migrations = [
     log         TEXT,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
   )`,
+
+  `CREATE TABLE IF NOT EXISTS repo_env_vars (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+    branch     TEXT    NOT NULL, -- 'main' | 'production'
+    key        TEXT    NOT NULL,
+    value      TEXT    NOT NULL DEFAULT '',
+    is_secret  INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(repo_id, branch, key)
+  )`,
 ];
 
 // Run all migrations in a single transaction
@@ -90,6 +102,8 @@ try {
 const alterMigrations = [
   `ALTER TABLE projects ADD COLUMN cron_expression TEXT`,
   `ALTER TABLE projects ADD COLUMN cron_enabled    INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE repos    ADD COLUMN main_url         TEXT`,
+  `ALTER TABLE repos    ADD COLUMN prod_url         TEXT`,
 ];
 
 for (const sql of alterMigrations) {

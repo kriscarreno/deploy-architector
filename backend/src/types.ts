@@ -41,6 +41,8 @@ export interface Repo {
   order_index: number;
   prod_branch: string;
   main_branch: string;
+  main_url: string | null;
+  prod_url: string | null;
   local_path: string | null;
   created_at: string;
   updated_at: string;
@@ -76,6 +78,19 @@ export interface DeployLogWithProjectName extends DeployLog {
 export interface Pagination {
   limit: number;
   offset: number;
+}
+
+export type EnvBranch = "main" | "production";
+
+export interface EnvVar {
+  id: number;
+  repo_id: number;
+  branch: EnvBranch;
+  key: string;
+  value: string;
+  is_secret: number; // SQLite boolean: 0 | 1
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProjectWithRepos extends Project {
