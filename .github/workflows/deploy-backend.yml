@@ -2,9 +2,9 @@ name: Deploy Backend to CapRover
 
 on:
   push:
-    branches: ['production']
+    branches: ["production"]
     paths:
-      - 'backend/**'
+      - "backend/**"
   workflow_dispatch:
 
 jobs:
@@ -22,9 +22,9 @@ jobs:
           echo "NODE_ENV=production" >> .env
           echo "PORT=3000" >> .env
           echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> .env
-          echo "GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}" >> .env
-          echo "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}" >> .env
-          echo "GITHUB_CALLBACK_URL=${{ secrets.GITHUB_CALLBACK_URL }}" >> .env
+          echo "GITHUB_CLIENT_ID=${{ secrets.GH_OAUTH_CLIENT_ID }}" >> .env
+          echo "GITHUB_CLIENT_SECRET=${{ secrets.GH_OAUTH_CLIENT_SECRET }}" >> .env
+          echo "GITHUB_CALLBACK_URL=${{ secrets.GH_OAUTH_CALLBACK_URL }}" >> .env
           echo "DB_PATH=./data/deploy_orchestrator.db" >> .env
           echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
           echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
@@ -46,6 +46,6 @@ jobs:
       - name: Deploy to CapRover
         uses: caprover/deploy-from-github@v1.1.2
         with:
-          server: '${{ secrets.CAPROVER_SERVER }}'
-          app: '${{ secrets.APP_NAME_BACKEND }}'
-          token: '${{ secrets.APP_TOKEN_BACKEND }}'
+          server: "${{ secrets.CAPROVER_SERVER }}"
+          app: "${{ secrets.APP_NAME_BACKEND }}"
+          token: "${{ secrets.APP_TOKEN_BACKEND }}"
