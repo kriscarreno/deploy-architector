@@ -77,7 +77,10 @@ function RepoFormFields({ register, errors, control }) {
           hint="URL pública de la rama main"
           error={errors.main_url?.message}
           {...register("main_url", {
-            pattern: { value: /^(https?:\/\/.+)?$/, message: "Debe ser una URL válida" },
+            pattern: {
+              value: /^(https?:\/\/.+)?$/,
+              message: "Debe ser una URL válida",
+            },
           })}
         />
         <Input
@@ -87,7 +90,10 @@ function RepoFormFields({ register, errors, control }) {
           hint="URL pública de producción"
           error={errors.prod_url?.message}
           {...register("prod_url", {
-            pattern: { value: /^(https?:\/\/.+)?$/, message: "Debe ser una URL válida" },
+            pattern: {
+              value: /^(https?:\/\/.+)?$/,
+              message: "Debe ser una URL válida",
+            },
           })}
         />
       </div>
@@ -566,9 +572,15 @@ function EnvVarsModal({
 
   // Reset paste state when modal closes or branch changes
   useEffect(() => {
-    if (!isOpen) { setPasteMode(false); setPasteText(""); }
+    if (!isOpen) {
+      setPasteMode(false);
+      setPasteText("");
+    }
   }, [isOpen]);
-  useEffect(() => { setPasteMode(false); setPasteText(""); }, [activeBranch]);
+  useEffect(() => {
+    setPasteMode(false);
+    setPasteText("");
+  }, [activeBranch]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -603,7 +615,9 @@ function EnvVarsModal({
         activeBranch,
         parsed.map((p) => ({ ...p, is_secret: false })),
       );
-      toastSuccess(`${imported} variable${imported !== 1 ? "s" : ""} importada${imported !== 1 ? "s" : ""}`);
+      toastSuccess(
+        `${imported} variable${imported !== 1 ? "s" : ""} importada${imported !== 1 ? "s" : ""}`,
+      );
       setPasteMode(false);
       setPasteText("");
       await load();
@@ -618,7 +632,9 @@ function EnvVarsModal({
     if (!repo) return;
     setSaving(true);
     try {
-      await envVarService.update(projectId, repo.id, v.id, { value: editValue });
+      await envVarService.update(projectId, repo.id, v.id, {
+        value: editValue,
+      });
       toastSuccess("Variable actualizada");
       setEditingId(null);
       await load();
@@ -655,7 +671,11 @@ function EnvVarsModal({
       title={`Variables de entorno — ${repo.name}`}
       footer={
         <div className="flex w-full items-center justify-between">
-          <Button variant="ghost" onClick={handleExport} title={`Descargar .env.${activeBranch}`}>
+          <Button
+            variant="ghost"
+            onClick={handleExport}
+            title={`Descargar .env.${activeBranch}`}
+          >
             ↓ Exportar .env
           </Button>
           <Button variant="secondary" onClick={onClose}>
@@ -696,14 +716,18 @@ function EnvVarsModal({
       {pasteMode ? (
         <div className="flex flex-col gap-3">
           <p className="text-xs text-slate-400">
-            Pega aquí el contenido de tu archivo <span className="font-mono text-slate-300">.env</span>.
-            Las líneas con comentarios (<span className="font-mono">#</span>) y las inválidas se ignoran.
-            Los valores existentes se <strong className="text-yellow-400">sobreescriben</strong>.
+            Pega aquí el contenido de tu archivo{" "}
+            <span className="font-mono text-slate-300">.env</span>. Las líneas
+            con comentarios (<span className="font-mono">#</span>) y las
+            inválidas se ignoran. Los valores existentes se{" "}
+            <strong className="text-yellow-400">sobreescriben</strong>.
           </p>
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder={"# Ejemplo\nDATABASE_URL=postgres://...\nAPI_KEY=secreto123\nDEBUG=false"}
+            placeholder={
+              "# Ejemplo\nDATABASE_URL=postgres://...\nAPI_KEY=secreto123\nDEBUG=false"
+            }
             rows={10}
             className="w-full rounded-lg border border-dark-border bg-black/40 px-3 py-2 font-mono text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
             spellCheck={false}
@@ -713,14 +737,23 @@ function EnvVarsModal({
           {parsed.length > 0 && (
             <div className="rounded-lg border border-dark-border bg-dark-surface p-3">
               <p className="mb-2 text-xs font-semibold text-slate-400">
-                Vista previa — {parsed.length} variable{parsed.length !== 1 ? "s" : ""} detectada{parsed.length !== 1 ? "s" : ""}:
+                Vista previa — {parsed.length} variable
+                {parsed.length !== 1 ? "s" : ""} detectada
+                {parsed.length !== 1 ? "s" : ""}:
               </p>
               <div className="max-h-36 overflow-y-auto flex flex-col gap-1">
                 {parsed.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2 font-mono text-xs">
-                    <span className="text-primary-300 w-40 shrink-0 truncate">{p.key}</span>
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 font-mono text-xs"
+                  >
+                    <span className="text-primary-300 w-40 shrink-0 truncate">
+                      {p.key}
+                    </span>
                     <span className="text-slate-400 shrink-0">=</span>
-                    <span className="text-slate-300 truncate">{p.value || <em className="text-slate-600">(vacío)</em>}</span>
+                    <span className="text-slate-300 truncate">
+                      {p.value || <em className="text-slate-600">(vacío)</em>}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -728,7 +761,9 @@ function EnvVarsModal({
           )}
 
           {pasteText && parsed.length === 0 && (
-            <p className="text-xs text-red-400">No se encontraron variables válidas en el texto pegado.</p>
+            <p className="text-xs text-red-400">
+              No se encontraron variables válidas en el texto pegado.
+            </p>
           )}
 
           <div className="flex gap-2">
@@ -739,7 +774,13 @@ function EnvVarsModal({
             >
               Importar {parsed.length > 0 ? `(${parsed.length})` : ""}
             </Button>
-            <Button variant="secondary" onClick={() => { setPasteMode(false); setPasteText(""); }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setPasteMode(false);
+                setPasteText("");
+              }}
+            >
               Cancelar
             </Button>
           </div>
@@ -773,7 +814,11 @@ function EnvVarsModal({
                 />
                 Secreto
               </label>
-              <Button type="submit" loading={saving} disabled={saving || !addKey.trim()}>
+              <Button
+                type="submit"
+                loading={saving}
+                disabled={saving || !addKey.trim()}
+              >
                 +
               </Button>
             </div>
@@ -786,7 +831,8 @@ function EnvVarsModal({
             </div>
           ) : vars.length === 0 ? (
             <p className="text-center text-sm text-slate-500 py-6">
-              No hay variables para la rama <span className="font-mono text-slate-300">{activeBranch}</span>.
+              No hay variables para la rama{" "}
+              <span className="font-mono text-slate-300">{activeBranch}</span>.
             </p>
           ) : (
             <div className="flex flex-col gap-1 max-h-72 overflow-y-auto pr-1">
@@ -849,7 +895,12 @@ function EnvVarsModal({
                         className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
                         title="Editar valor"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-3.5 w-3.5"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
                           <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                         </svg>
                       </button>
@@ -859,7 +910,12 @@ function EnvVarsModal({
                       className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
                       title="Eliminar"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-3.5 w-3.5"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
                         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                       </svg>
                     </button>
@@ -874,246 +930,15 @@ function EnvVarsModal({
   );
 }
 
-  const load = async () => {
-    if (!repo) return;
-    setLoading(true);
-    try {
-      const data = await envVarService.getAll(projectId, repo.id, activeBranch);
-      setVars(data);
-    } catch (err) {
-      toastError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && repo) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, repo, activeBranch]);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!repo || !addKey.trim()) return;
-    setSaving(true);
-    try {
-      await envVarService.upsert(projectId, repo.id, {
-        branch: activeBranch,
-        key: addKey.trim().toUpperCase(),
-        value: addValue,
-        is_secret: addSecret,
-      });
-      toastSuccess("Variable guardada");
-      setAddKey("");
-      setAddValue("");
-      setAddSecret(false);
-      await load();
-    } catch (err) {
-      toastError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUpdate = async (v: EnvVar) => {
-    if (!repo) return;
-    setSaving(true);
-    try {
-      await envVarService.update(projectId, repo.id, v.id, { value: editValue });
-      toastSuccess("Variable actualizada");
-      setEditingId(null);
-      await load();
-    } catch (err) {
-      toastError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (envId: number) => {
-    if (!repo || !window.confirm("¿Eliminar esta variable?")) return;
-    try {
-      await envVarService.remove(projectId, repo.id, envId);
-      toastSuccess("Variable eliminada");
-      await load();
-    } catch (err) {
-      toastError(getErrorMessage(err));
-    }
-  };
-
-  const handleExport = () => {
-    if (!repo) return;
-    const url = envVarService.exportUrl(projectId, repo.id, activeBranch);
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  if (!repo) return null;
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Variables de entorno — ${repo.name}`}
-      footer={
-        <div className="flex w-full items-center justify-between">
-          <Button variant="ghost" onClick={handleExport} title={`Descargar .env.${activeBranch}`}>
-            ↓ Exportar .env
-          </Button>
-          <Button variant="secondary" onClick={onClose}>
-            Cerrar
-          </Button>
-        </div>
-      }
-    >
-      {/* Branch tabs */}
-      <div className="mb-4 flex gap-2">
-        {ENV_BRANCHES.map((b) => (
-          <button
-            key={b}
-            onClick={() => setActiveBranch(b)}
-            className={`rounded-full px-4 py-1 text-sm font-medium transition-colors ${
-              activeBranch === b
-                ? "bg-primary-600 text-white"
-                : "bg-dark-surface text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            {b}
-          </button>
-        ))}
-      </div>
-
-      {/* Add variable form */}
-      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2">
-        <div className="flex gap-2">
-          <input
-            value={addKey}
-            onChange={(e) => setAddKey(e.target.value)}
-            placeholder="NOMBRE_VAR"
-            className="form-input flex-1 font-mono text-sm uppercase"
-            pattern="[A-Za-z_][A-Za-z0-9_]*"
-            title="Letras, dígitos y guión bajo"
-          />
-          <input
-            value={addValue}
-            onChange={(e) => setAddValue(e.target.value)}
-            placeholder="valor"
-            type={addSecret ? "password" : "text"}
-            className="form-input flex-1 font-mono text-sm"
-          />
-          <label className="flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={addSecret}
-              onChange={(e) => setAddSecret(e.target.checked)}
-              className="accent-primary-500"
-            />
-            Secreto
-          </label>
-          <Button type="submit" loading={saving} disabled={saving || !addKey.trim()}>
-            +
-          </Button>
-        </div>
-      </form>
-
-      {/* Variables list */}
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner />
-        </div>
-      ) : vars.length === 0 ? (
-        <p className="text-center text-sm text-slate-500 py-6">
-          No hay variables para la rama <span className="font-mono text-slate-300">{activeBranch}</span>.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1 max-h-72 overflow-y-auto pr-1">
-          {vars.map((v) => (
-            <div
-              key={v.id}
-              className="flex items-center gap-2 rounded-lg bg-dark-surface px-3 py-2"
-            >
-              <span className="w-40 shrink-0 font-mono text-xs font-semibold text-primary-300 truncate">
-                {v.key}
-              </span>
-              {editingId === v.id ? (
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  className="form-input flex-1 font-mono text-xs py-1"
-                />
-              ) : (
-                <span className="flex-1 font-mono text-xs text-slate-300 truncate">
-                  {v.is_secret && !showSecret[v.id] ? "••••••••" : v.value}
-                </span>
-              )}
-              <div className="flex shrink-0 items-center gap-1">
-                {v.is_secret && editingId !== v.id && (
-                  <button
-                    onClick={() =>
-                      setShowSecret((s) => ({ ...s, [v.id]: !s[v.id] }))
-                    }
-                    className="rounded p-1 text-xs text-slate-500 hover:text-slate-300"
-                    title={showSecret[v.id] ? "Ocultar" : "Mostrar"}
-                  >
-                    {showSecret[v.id] ? "🙈" : "👁"}
-                  </button>
-                )}
-                {editingId === v.id ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleUpdate(v)}
-                      loading={saving}
-                      disabled={saving}
-                      className="py-1 px-2 text-xs"
-                    >
-                      Guardar
-                    </Button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="rounded p-1 text-xs text-slate-500 hover:text-slate-300"
-                    >
-                      ✕
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setEditingId(v.id);
-                      setEditValue(v.value);
-                    }}
-                    className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
-                    title="Editar valor"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                    </svg>
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDelete(v.id)}
-                  className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
-                  title="Eliminar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
 // Project Detail Page
 function ProjectDetailPage() {
   const { id } = useParams();
   const [addRepoOpen, setAddRepoOpen] = useState(false);
   const [editRepo, setEditRepo] = useState(null);
-  const [envVarsRepo, setEnvVarsRepo] = useState<{ id: number; name: string } | null>(null);
+  const [envVarsRepo, setEnvVarsRepo] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const { toastSuccess, toastError } = useToast();
   const { startTour } = useProjectTour();
   const {
@@ -1244,8 +1069,13 @@ function ProjectDetailPage() {
             title="Variables de entorno"
             className="rounded p-1 text-slate-500 hover:text-yellow-400 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20 3H4v2h16V3zm1 7H3v2h18v-2zm-1 7H4v2h16v-2z"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M20 3H4v2h16V3zm1 7H3v2h18v-2zm-1 7H4v2h16v-2z" />
             </svg>
           </button>
           <button
