@@ -15,6 +15,7 @@ const ProjectsPage = lazy(() => import("../pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("../pages/ProjectDetailPage"));
 const HistoryPage = lazy(() => import("../pages/HistoryPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
+const TransparencyPage = lazy(() => import("../pages/TransparencyPage"));
 
 /** Fallback de suspense global */
 const PageFallback = () => (
@@ -80,6 +81,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <HistoryPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/transparency",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TransparencyPage />
           </Suspense>
         ),
       },
