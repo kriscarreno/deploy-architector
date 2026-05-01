@@ -66,20 +66,22 @@ export async function cloneOrFetch(repo, token) {
 
   const clonePath = localPath(repo.id);
   const authUrl = buildAuthUrl(repo.github_url, token);
-  const git = simpleGit({
-    baseDir: clonePath.includes(path.sep) ? path.dirname(clonePath) : ".",
-  });
 
   if (!fs.existsSync(clonePath)) {
     await simpleGit().clone(authUrl, clonePath);
   } else {
-    // Update remote URL in case token changed
     const repoGit = simpleGit(clonePath);
     await repoGit.remote(["set-url", "origin", authUrl]);
     await repoGit.fetch(["--all", "--prune"]);
   }
 
-  return simpleGit(clonePath);
+  // Ensure git identity is always set — required for merge/rebase commits
+  // inside Docker containers where global git config doesn't exist.
+  const git = simpleGit(clonePath);
+  await git.addConfig("user.email", "deploy-bot@deploy-architector.local");
+  await git.addConfig("user.name", "Deploy Architector");
+
+  return git;
 }
 
 /**

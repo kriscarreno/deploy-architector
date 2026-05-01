@@ -25,8 +25,9 @@ export function configurePassport(userRepository) {
         clientID: env.GITHUB_CLIENT_ID,
         clientSecret: env.GITHUB_CLIENT_SECRET,
         callbackURL: env.GITHUB_CALLBACK_URL,
-        // Request the repo scope so we can push to repos on behalf of the user
-        scope: ["user:email", "repo"],
+        // repo: acceso completo a repos privados (personales y de org)
+        // read:org: necesario para que el token funcione con repos de organizaciones
+        scope: ["user:email", "repo", "read:org"],
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
