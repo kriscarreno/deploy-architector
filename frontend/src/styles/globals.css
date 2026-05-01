@@ -2,8 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Driver.js styles */
-@import "driver.js/dist/driver.css";
+/* ── Driver.js dark theme ───────────────────────────────────────────────── */
+/* .driverjs-dark-theme is added directly to the .driver-popover root element */
+
+.driverjs-dark-theme {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  border-radius: 10px !important;
+  color: #e2e8f0 !important;
+  padding: 18px 20px !important;
+  min-width: 280px !important;
+  max-width: 340px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Arrow colors — match bg */
+.driverjs-dark-theme .driver-popover-arrow-side-top {
+  border-top-color: #1e293b !important;
+}
+.driverjs-dark-theme .driver-popover-arrow-side-bottom {
+  border-bottom-color: #1e293b !important;
+}
+.driverjs-dark-theme .driver-popover-arrow-side-left {
+  border-left-color: #1e293b !important;
+}
+.driverjs-dark-theme .driver-popover-arrow-side-right {
+  border-right-color: #1e293b !important;
+}
+
+.driverjs-dark-theme .driver-popover-title {
+  color: #f1f5f9 !important;
+  font-size: 0.9375rem !important;
+  font-weight: 600 !important;
+  font-family: ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.driverjs-dark-theme .driver-popover-description {
+  color: #94a3b8 !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.6 !important;
+  font-family: ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.driverjs-dark-theme .driver-popover-progress-text {
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+}
+
+.driverjs-dark-theme .driver-popover-close-btn {
+  color: #64748b !important;
+}
+.driverjs-dark-theme .driver-popover-close-btn:hover {
+  color: #e2e8f0 !important;
+}
+
+.driverjs-dark-theme .driver-popover-footer {
+  margin-top: 16px !important;
+}
+
+.driverjs-dark-theme .driver-popover-next-btn,
+.driverjs-dark-theme .driver-popover-done-btn {
+  background: #0ea5e9 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 6px 14px !important;
+  font-size: 0.8125rem !important;
+  font-family: ui-sans-serif, system-ui, sans-serif !important;
+  cursor: pointer !important;
+  text-shadow: none !important;
+}
+.driverjs-dark-theme .driver-popover-next-btn:hover,
+.driverjs-dark-theme .driver-popover-done-btn:hover {
+  background: #38bdf8 !important;
+}
+
+.driverjs-dark-theme .driver-popover-prev-btn {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 6px !important;
+  padding: 6px 14px !important;
+  font-size: 0.8125rem !important;
+  font-family: ui-sans-serif, system-ui, sans-serif !important;
+  cursor: pointer !important;
+  text-shadow: none !important;
+}
+.driverjs-dark-theme .driver-popover-prev-btn:hover {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+}
 
 /* Dark theme overrides for Driver.js */
 .driverjs-dark-theme {

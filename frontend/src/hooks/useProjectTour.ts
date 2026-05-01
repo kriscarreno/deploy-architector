@@ -1,10 +1,3 @@
-/**
- * useProjectTour
- *
- * Provides a Driver.js guided tour for the Project Detail page.
- * The tour is shown automatically the first time a user visits the page
- * (tracked via localStorage) and can be re-triggered with `startTour()`.
- */
 import { useEffect } from "react";
 import { driver } from "driver.js";
 
@@ -16,7 +9,7 @@ const STEPS = [
     popover: {
       title: "Detalle del proyecto",
       description:
-        "Aquí ves el nombre y descripción del proyecto. Usa el botón <strong>+ Añadir repo</strong> para añadir repositorios y <strong>Desplegar ahora</strong> para lanzar un despliegue.",
+        "Aqui ves el nombre y descripcion del proyecto. Usa el boton <strong>+ Anadir repo</strong> para anadir repositorios y <strong>Desplegar ahora</strong> para lanzar un despliegue.",
       side: "bottom" as const,
       align: "start" as const,
     },
@@ -26,8 +19,8 @@ const STEPS = [
     popover: {
       title: "Repositorios",
       description:
-        "Cada fila es un repositorio Git. El orden determina la secuencia de despliegue. La columna <strong>Sincronización</strong> muestra si <em>main</em> y <em>production</em> están al día.",
-      side: "top" as const,
+        "Cada fila es un repositorio Git. El orden determina la secuencia de despliegue. La columna <strong>Sincronizacion</strong> muestra si <em>main</em> y <em>production</em> estan al dia.",
+      side: "bottom" as const,
       align: "start" as const,
     },
   },
@@ -36,7 +29,7 @@ const STEPS = [
     popover: {
       title: "Cambios pendientes",
       description:
-        "Pulsa <strong>Ver cambios</strong> para comparar las ramas <em>main</em> y <em>production</em> de cada repo. Verás exactamente qué commits se desplegarán.",
+        "Pulsa <strong>Ver cambios</strong> para comparar las ramas <em>main</em> y <em>production</em> de cada repo. Veras exactamente que commits se desplegaran.",
       side: "top" as const,
       align: "start" as const,
     },
@@ -46,7 +39,7 @@ const STEPS = [
     popover: {
       title: "Despliegue programado",
       description:
-        "Activa el interruptor para configurar despliegues automáticos periódicos. Elige una frecuencia predefinida o escribe tu propia expresión cron.",
+        "Activa el interruptor para configurar despliegues automaticos periodicos. Elige una frecuencia predefinida o escribe tu propia expresion cron.",
       side: "top" as const,
       align: "start" as const,
     },
@@ -55,16 +48,25 @@ const STEPS = [
 
 export function useProjectTour() {
   const startTour = () => {
+    const mainEl = document.getElementById("main-content");
+    if (mainEl) mainEl.scrollTop = 0;
+
     const driverObj = driver({
       showProgress: true,
       animate: true,
-      overlayColor: "rgba(0,0,0,0.6)",
+      overlayColor: "rgba(0,0,0,0.65)",
       stagePadding: 8,
-      stageRadius: 12,
+      stageRadius: 10,
       popoverClass: "driverjs-dark-theme",
-      nextBtnText: "Siguiente →",
-      prevBtnText: "← Anterior",
+      nextBtnText: "Siguiente ->",
+      prevBtnText: "<- Anterior",
       doneBtnText: "Entendido",
+      smoothScroll: true,
+      onHighlightStarted: (element) => {
+        if (element && mainEl) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      },
       onDestroyStarted: () => {
         localStorage.setItem(STORAGE_KEY, "1");
         driverObj.destroy();
@@ -74,11 +76,9 @@ export function useProjectTour() {
     driverObj.drive();
   };
 
-  // Auto-start on first visit
   useEffect(() => {
     if (localStorage.getItem(STORAGE_KEY)) return;
-    // Small delay so the page finishes rendering
-    const t = setTimeout(startTour, 600);
+    const t = setTimeout(startTour, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import cronstrue from "cronstrue";
 import useProjectStore from "../store/projectStore";
 import useDeploy, { JOB_STATUS } from "../hooks/useDeploy";
@@ -13,26 +13,31 @@ import Input from "../components/common/Input";
 import Table from "../components/common/Table";
 import Spinner from "../components/common/Spinner";
 import Badge, { statusVariant } from "../components/common/Badge";
+import RepoAutocomplete from "../components/common/RepoAutocomplete";
 import { branchRules, orderRules } from "../utils/validators";
 import projectService from "../services/projectService";
 
 // Shared repo form fields
-function RepoFormFields({ register, errors }) {
+function RepoFormFields({ register, errors, control }) {
   return (
     <>
-      <Input
-        id="git-url"
-        label="URL del repositorio (git)"
-        required
-        placeholder="https://github.com/org/repo.git"
-        error={errors.git_url?.message}
-        {...register("git_url", {
+      <Controller
+        name="git_url"
+        control={control}
+        rules={{
           required: "La URL es obligatoria",
           pattern: {
             value: /^https?:\/\/.+/,
             message: "Debe ser una URL válida",
           },
-        })}
+        }}
+        render={({ field }) => (
+          <RepoAutocomplete
+            value={field.value ?? ""}
+            onChange={field.onChange}
+            error={errors.git_url?.message}
+          />
+        )}
       />
       <div className="grid grid-cols-2 gap-4">
         <Input
@@ -72,9 +77,11 @@ function AddRepoModal({ isOpen, onClose, onSubmit }) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
+      git_url: "",
       main_branch: "main",
       production_branch: "production",
       order: 1,
@@ -119,7 +126,7 @@ function AddRepoModal({ isOpen, onClose, onSubmit }) {
         noValidate
         className="flex flex-col gap-4"
       >
-        <RepoFormFields register={register} errors={errors} />
+        <RepoFormFields register={register} errors={errors} control={control} />
       </form>
     </Modal>
   );
@@ -131,6 +138,7 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm();
 
@@ -172,7 +180,7 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
         noValidate
         className="flex flex-col gap-4"
       >
-        <RepoFormFields register={register} errors={errors} />
+        <RepoFormFields register={register} errors={errors} control={control} />
       </form>
     </Modal>
   );
