@@ -99,6 +99,86 @@ export async function cloneOrFetch(repo, token) {
  * @param {string}     token       GitHub token (needed for push auth)
  * @param {string}     githubUrl
  */
+/**
+ * Compares two remote tracking branches and returns a human-readable summary:
+ *  - How many commits main is ahead of production (will be deployed)
+ *  - How many commits production is ahead of main (diverged / direct commits on prod)
+ *  - One-line list of commits that will land on production
+ *
+ * Uses remote tracking refs so no checkout is needed — safe to call right
+ * after cloneOrFetch.
+ */
+export async function getDiffSummary(
+  git,
+  mainBranch: string,
+  prodBranch: string,
+): Promise<string> {
+  try {
+    const ahead = (
+      await git.raw([
+        "rev-list",
+        "--count",
+        `origin/${prodBranch}..origin/${mainBranch}`,
+      ])
+    ).trim();
+
+    const behind = (
+      await git.raw([
+        "rev-list",
+        "--count",
+        `origin/${mainBranch}..origin/${prodBranch}`,
+      ])
+    ).trim();
+
+    const aheadN = parseInt(ahead, 10);
+    const behindN = parseInt(behind, 10);
+
+    if (aheadN === 0 && behindN === 0) {
+      return `  ↔ ${mainBranch} and ${prodBranch} are identical — nothing to deploy`;
+    }
+
+    const lines: string[] = [];
+
+    if (aheadN > 0) {
+      lines.push(
+        `  ↑ ${aheadN} commit(s) in ${mainBranch} not yet in ${prodBranch}:`,
+      );
+      const log = (
+        await git.raw([
+          "log",
+          "--oneline",
+          "--no-color",
+          `origin/${prodBranch}..origin/${mainBranch}`,
+        ])
+      ).trim();
+      for (const line of log.split("\n").filter(Boolean)) {
+        lines.push(`      ${line}`);
+      }
+    }
+
+    if (behindN > 0) {
+      lines.push(
+        `  ⚠ ${behindN} commit(s) exist directly on ${prodBranch} not in ${mainBranch} (will be rebased over):`,
+      );
+      const log = (
+        await git.raw([
+          "log",
+          "--oneline",
+          "--no-color",
+          `origin/${mainBranch}..origin/${prodBranch}`,
+        ])
+      ).trim();
+      for (const line of log.split("\n").filter(Boolean)) {
+        lines.push(`      ${line}`);
+      }
+    }
+
+    return lines.join("\n");
+  } catch (_) {
+    return "  (diff summary unavailable)";
+  }
+}
+
 /** Aborts any in-progress rebase and swallows the error if there's nothing to abort. */
 async function safeAbortRebase(git) {
   try {

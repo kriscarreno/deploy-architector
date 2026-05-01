@@ -30,7 +30,12 @@ import { ProjectRepository } from "../repositories/ProjectRepository.js";
 import { RepoRepository } from "../repositories/RepoRepository.js";
 import { UserRepository } from "../repositories/UserRepository.js";
 import { LockService } from "../services/LockService.js";
-import { cloneOrFetch, mergeAndPush, localPath } from "../utils/gitHelper.js";
+import {
+  cloneOrFetch,
+  mergeAndPush,
+  getDiffSummary,
+  localPath,
+} from "../utils/gitHelper.js";
 import logger from "../config/logger.js";
 
 // Instantiate repositories (no DI container — worker is simple enough)
@@ -109,9 +114,17 @@ deployQueue.process(CONCURRENCY, async (job) => {
         const lp = localPath(repo.id);
         await repoRepo.updateLocalPath(repo.id, lp);
 
-        // c. Rebase prod onto main and force-push
+        // Show diff summary before deploying
+        const diff = await getDiffSummary(
+          git,
+          repo.main_branch,
+          repo.prod_branch,
+        );
+        log(`[${repo.name}] Diff summary:\n${diff}`);
+
+        // c. Rebase main onto prod and fast-forward prod
         log(
-          `[${repo.name}] Rebasing ${repo.prod_branch} onto ${repo.main_branch} and force-pushing...`,
+          `[${repo.name}] Rebasing ${repo.main_branch} onto ${repo.prod_branch} and advancing ${repo.prod_branch}...`,
         );
         await mergeAndPush(git, {
           prodBranch: repo.prod_branch,
