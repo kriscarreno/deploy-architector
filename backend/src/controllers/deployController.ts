@@ -5,6 +5,7 @@
  * Delegates ALL business logic to DeployService.
  */
 import Joi from "joi";
+import { createSubscriber, deployChannel } from "../config/redisSub.js";
 
 const paginationSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
@@ -53,6 +54,82 @@ export function makeDeployController(deployService) {
         pagination,
       );
       res.json({ data: history });
+    },
+
+    /**
+     * GET /api/jobs/:jobId/stream
+     * Server-Sent Events endpoint — streams deploy log lines in real time.
+     * Not wrapped in asyncHandler: manages the connection lifetime itself.
+     */
+    streamJobLogs(req, res) {
+      const { jobId } = req.params;
+      const userId = req.user.id;
+      const FINAL = new Set(["success", "failed", "conflict"]);
+
+      // Auth check before opening the SSE connection
+      deployService
+        .getJobStatus(jobId, userId)
+        .then((logEntry) => {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          // Disable nginx/CapRover proxy buffering so lines arrive immediately
+          res.setHeader("X-Accel-Buffering", "no");
+          res.flushHeaders();
+
+          const send = (payload: object) => {
+            if (!res.writableEnded) {
+              res.write(`data: ${JSON.stringify(payload)}\n\n`);
+            }
+          };
+
+          // If already finished, replay stored log and close
+          if (FINAL.has(logEntry.status)) {
+            if (logEntry.log) {
+              for (const line of String(logEntry.log)
+                .split("\n")
+                .filter(Boolean)) {
+                send({ type: "log", line });
+              }
+            }
+            send({ type: "done", status: logEntry.status });
+            res.end();
+            return;
+          }
+
+          // Job still running — subscribe to Redis pub/sub channel
+          const sub = createSubscriber();
+          const channel = deployChannel(jobId);
+
+          sub.subscribe(channel, (err) => {
+            if (err) {
+              send({ type: "error", message: "Log stream unavailable" });
+              res.end();
+              sub.disconnect();
+            }
+          });
+
+          sub.on("message", (_ch: string, message: string) => {
+            try {
+              if (!res.writableEnded) res.write(`data: ${message}\n\n`);
+              const parsed = JSON.parse(message) as { type: string };
+              if (parsed.type === "done") {
+                sub.disconnect();
+                if (!res.writableEnded) res.end();
+              }
+            } catch (_) {}
+          });
+
+          // Clean up when client disconnects
+          req.on("close", () => sub.disconnect());
+        })
+        .catch((err: { statusCode?: number; message: string }) => {
+          if (!res.headersSent) {
+            res
+              .status(err.statusCode ?? 500)
+              .json({ error: { message: err.message } });
+          }
+        });
     },
   };
 }

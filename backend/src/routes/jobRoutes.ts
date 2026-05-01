@@ -14,6 +14,10 @@ export function makeJobRouter(deployCtrl) {
   router.use(requireAuth);
   router.get("/", asyncHandler(deployCtrl.getGlobalHistory));
   router.get("/:jobId", asyncHandler(deployCtrl.getJobStatus));
+  // SSE — no asyncHandler, the handler manages the connection lifetime itself
+  router.get("/:jobId/stream", (req, res) =>
+    deployCtrl.streamJobLogs(req, res),
+  );
 
   return router;
 }

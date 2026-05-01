@@ -37,6 +37,8 @@ import {
   localPath,
 } from "../utils/gitHelper.js";
 import logger from "../config/logger.js";
+import redisClient from "../config/redis.js";
+import { deployChannel } from "../config/redisSub.js";
 
 // Instantiate repositories (no DI container — worker is simple enough)
 const deployLogRepo = new DeployLogRepository();
@@ -60,10 +62,16 @@ deployQueue.process(CONCURRENCY, async (job) => {
     startedAt: new Date().toISOString(),
   });
 
-  const logLines = [];
-  const log = (msg) => {
-    logLines.push(`[${new Date().toISOString()}] ${msg}`);
+  const logLines: string[] = [];
+  const channel = deployChannel(jobId);
+  const log = (msg: string) => {
+    const line = `[${new Date().toISOString()}] ${msg}`;
+    logLines.push(line);
     logger.info(msg, { jobId });
+    // Fire-and-forget: publish to SSE subscribers
+    redisClient
+      .publish(channel, JSON.stringify({ type: "log", line }))
+      .catch(() => {});
   };
 
   try {
@@ -170,19 +178,30 @@ deployQueue.process(CONCURRENCY, async (job) => {
       finishedAt: new Date().toISOString(),
       log: logLines.join("\n"),
     });
+    // Publish done AFTER DB is updated so clients that re-fetch see the final log
+    redisClient
+      .publish(channel, JSON.stringify({ type: "done", status: overallStatus }))
+      .catch(() => {});
   } catch (err) {
     logger.error("Deploy job fatal error", {
       jobId,
       err: err.message,
       stack: err.stack,
     });
-    logLines.push(`[FATAL] ${err.message}`);
+    const fatalLine = `[FATAL] ${err.message}`;
+    logLines.push(fatalLine);
+    redisClient
+      .publish(channel, JSON.stringify({ type: "log", line: fatalLine }))
+      .catch(() => {});
 
     await deployLogRepo.updateStatus(jobId, {
       status: "failed",
       finishedAt: new Date().toISOString(),
       log: logLines.join("\n"),
     });
+    redisClient
+      .publish(channel, JSON.stringify({ type: "done", status: "failed" }))
+      .catch(() => {});
 
     // Re-throw so Bull marks the job as failed
     throw err;

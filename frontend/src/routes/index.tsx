@@ -11,6 +11,7 @@ import Spinner from "../components/common/Spinner";
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../pages/AuthCallbackPage"));
 const DashboardPage = lazy(() => import("../pages/DashboardPage"));
+const ProjectsPage = lazy(() => import("../pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("../pages/ProjectDetailPage"));
 const HistoryPage = lazy(() => import("../pages/HistoryPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
@@ -55,6 +56,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <DashboardPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/projects",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <ProjectsPage />
           </Suspense>
         ),
       },

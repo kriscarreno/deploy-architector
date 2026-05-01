@@ -1,28 +1,34 @@
 /**
- * @file useToast.js
+ * @file useToast.ts
  * @description Wrapper sobre react-hot-toast para toasts consistentes.
+ * Las funciones se memorizan con useCallback para que sean referencias
+ * estables entre renders y no disparen efectos en bucle.
  */
+import { useCallback } from "react";
 import toast from "react-hot-toast";
 
-/**
- * @returns {{
- *   toastSuccess: (msg: string) => void,
- *   toastError:   (msg: string) => void,
- *   toastInfo:    (msg: string) => void,
- *   toastLoading: (msg: string) => string,
- *   toastDismiss: (id?: string) => void,
- * }}
- */
 function useToast() {
-  const toastSuccess = (msg) => toast.success(msg, { duration: 4000 });
+  const toastSuccess = useCallback(
+    (msg: string) => toast.success(msg, { duration: 4000 }),
+    [],
+  );
 
-  const toastError = (msg) => toast.error(msg, { duration: 6000 });
+  const toastError = useCallback(
+    (msg: string) => toast.error(msg, { duration: 6000 }),
+    [],
+  );
 
-  const toastInfo = (msg) => toast(msg, { icon: "ℹ️", duration: 4000 });
+  const toastInfo = useCallback(
+    (msg: string) => toast(msg, { icon: "ℹ️", duration: 4000 }),
+    [],
+  );
 
-  const toastLoading = (msg) => toast.loading(msg);
+  const toastLoading = useCallback((msg: string) => toast.loading(msg), []);
 
-  const toastDismiss = (id) => (id ? toast.dismiss(id) : toast.dismiss());
+  const toastDismiss = useCallback(
+    (id?: string) => (id ? toast.dismiss(id) : toast.dismiss()),
+    [],
+  );
 
   return { toastSuccess, toastError, toastInfo, toastLoading, toastDismiss };
 }

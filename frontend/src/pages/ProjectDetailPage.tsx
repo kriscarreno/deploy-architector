@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import useProjectStore from "../store/projectStore";
@@ -178,25 +178,23 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
 // Panel de despliegue
 interface DeployPanelProps {
   status: string;
-  jobData: import("../types").DeployJob | null;
-  checking: boolean;
-  onCheck: () => void;
+  streamLines: string[];
   onReset: () => void;
 }
 
-function DeployPanel({
-  status,
-  jobData,
-  checking,
-  onCheck,
-  onReset,
-}: DeployPanelProps) {
-  if (status === JOB_STATUS.IDLE) return null;
-
-  const logText: string = jobData?.log ?? "";
-  const logLines: string[] = logText ? logText.split("\n").filter(Boolean) : [];
+function DeployPanel({ status, streamLines, onReset }: DeployPanelProps) {
+  const logRef = useRef<HTMLDivElement>(null);
   const isFinished =
     status === JOB_STATUS.SUCCESS || status === JOB_STATUS.FAILED;
+
+  // Auto-scroll al final con cada nueva línea
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [streamLines]);
+
+  if (status === JOB_STATUS.IDLE) return null;
 
   return (
     <div className="mt-6 rounded-xl border border-dark-border bg-dark-bg p-5">
@@ -207,22 +205,24 @@ function DeployPanel({
 
       <div className="mb-4 flex items-center gap-3">
         {!isFinished && (
-          <Button variant="secondary" loading={checking} onClick={onCheck}>
-            {checking ? "Consultando…" : "Actualizar estado"}
-          </Button>
+          <span className="flex items-center gap-1.5 text-xs text-primary-400">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary-400" />
+            Transmitiendo logs en tiempo real…
+          </span>
         )}
         <Button variant="ghost" onClick={onReset}>
           Cerrar
         </Button>
       </div>
 
-      {logLines.length > 0 && (
+      {streamLines.length > 0 && (
         <div
+          ref={logRef}
           className="max-h-64 overflow-y-auto rounded-lg bg-black/60 p-3 font-mono text-xs text-green-300"
           aria-live="polite"
           aria-label="Logs del despliegue"
         >
-          {logLines.map((line, i) => (
+          {streamLines.map((line, i) => (
             <div key={i}>{line}</div>
           ))}
         </div>
@@ -256,8 +256,7 @@ function ProjectDetailPage() {
     clearSelectedProject,
   } = useProjectStore();
 
-  const { deploy, status, jobData, isDeploying, checking, checkStatus, reset } =
-    useDeploy(id);
+  const { deploy, status, streamLines, isDeploying, reset } = useDeploy(id);
 
   useEffect(() => {
     fetchProject(id);
@@ -407,13 +406,7 @@ function ProjectDetailPage() {
         />
       </div>
 
-      <DeployPanel
-        status={status}
-        jobData={jobData}
-        checking={checking}
-        onCheck={checkStatus}
-        onReset={reset}
-      />
+      <DeployPanel status={status} streamLines={streamLines} onReset={reset} />
 
       <AddRepoModal
         isOpen={addRepoOpen}
