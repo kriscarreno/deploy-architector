@@ -99,10 +99,30 @@ export async function cloneOrFetch(repo, token) {
  * @param {string}     token       GitHub token (needed for push auth)
  * @param {string}     githubUrl
  */
+/** Aborts any in-progress rebase and swallows the error if there's nothing to abort. */
+async function safeAbortRebase(git) {
+  try {
+    await git.rebase(["--abort"]);
+  } catch (_) {
+    /* no rebase in progress — ignore */
+  }
+}
+
+/** Returns the list of conflicted files, or an empty array if none. */
+async function conflictedFiles(git): Promise<string[]> {
+  try {
+    const status = await git.status();
+    return status.conflicted ?? [];
+  } catch (_) {
+    return [];
+  }
+}
+
 export async function mergeAndPush(
   git,
   { prodBranch, mainBranch, token, githubUrl },
 ) {
+  const repoLabel = sanitiseUrl(githubUrl);
   const authUrl = buildAuthUrl(githubUrl, token);
 
   // Ensure the authenticated remote URL is set before any network operation
@@ -111,30 +131,40 @@ export async function mergeAndPush(
   // 1. git checkout {prod_branch}
   await git.checkout(prodBranch);
 
-  // 2. git pull -r  (rebase local prod onto origin/prod)
+  // 2. Sync local prod with remote prod (rebase)
   try {
     await git.pull(["--rebase"]);
   } catch (pullErr) {
-    try {
-      await git.rebase(["--abort"]);
-    } catch (_) {
-      /* already clean */
-    }
-    throw pullErr;
+    await safeAbortRebase(git);
+    const files = await conflictedFiles(git);
+    const detail = files.length
+      ? `Conflicting files: ${files.join(", ")}`
+      : pullErr.message;
+    throw new Error(
+      `[${repoLabel}] CONFLICT syncing ${prodBranch} with origin/${prodBranch}. ${detail}`,
+    );
   }
 
-  // 3. git pull -r origin {main_branch}  (rebase prod onto main)
+  // 3. Rebase prod onto main
   try {
     await git.pull(["--rebase", "origin", mainBranch]);
   } catch (rebaseErr) {
-    try {
-      await git.rebase(["--abort"]);
-    } catch (_) {
-      /* already clean */
-    }
-    throw rebaseErr;
+    const files = await conflictedFiles(git);
+    await safeAbortRebase(git);
+    const fileList = files.length
+      ? `\nConflicting files:\n${files.map((f) => `  • ${f}`).join("\n")}`
+      : `\nGit output: ${rebaseErr.message}`;
+    throw new Error(
+      `[${repoLabel}] CONFLICT rebasing ${prodBranch} onto ${mainBranch}.${fileList}`,
+    );
   }
 
   // 4. git push -f
-  await git.push(["--force"]);
+  try {
+    await git.push(["--force"]);
+  } catch (pushErr) {
+    throw new Error(
+      `[${repoLabel}] ERROR pushing ${prodBranch} to origin: ${pushErr.message}`,
+    );
+  }
 }
