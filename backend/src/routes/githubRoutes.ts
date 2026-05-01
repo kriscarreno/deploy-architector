@@ -3,12 +3,12 @@
  *
  * GitHub-proxy endpoints. All routes require authentication.
  *
- * GET /api/github/repos?q=<search>&page=<n>
- *   Returns repos the authenticated user has access to, optionally filtered
- *   by a search query.  Uses GitHub's Search API when q is provided,
- *   otherwise lists the user's repos ordered by most recently pushed.
+ * GET /api/github/repos?q=<search>
+ *   Returns repos the authenticated user has access to (owner, collaborator,
+ *   organisation member), optionally filtered by a local keyword search.
+ *   Results are never mixed with unrelated public repos.
  *
- * Results are cached per-user in memory for 60 s to avoid hammering the
+ * The repo list is cached per-user in memory for 60 s to avoid hammering the
  * GitHub API on every keystroke.
  */
 import { Router } from "express";
@@ -18,16 +18,9 @@ import { asyncHandler } from "../middlewares/asyncHandler.js";
 const router = Router();
 router.use(requireAuth);
 
-// ── In-memory caches ──────────────────────────────────────────────────────
+// ── In-memory cache ─────────────────────────────────────────────────────
 const listCache = new Map<number, { ts: number; data: GithubRepo[] }>();
 const LIST_TTL = 60_000; // 60 s
-
-// Search cache: user_id → Map<query, {ts, data}>
-const searchCache = new Map<
-  number,
-  Map<string, { ts: number; data: GithubRepo[] }>
->();
-const SEARCH_TTL = 30_000; // 30 s
 
 interface GithubRepo {
   id: number;
@@ -37,10 +30,6 @@ interface GithubRepo {
   description: string | null;
   private: boolean;
   pushed_at: string | null;
-}
-
-interface GithubSearchResponse {
-  items: GithubRepo[];
 }
 
 const GITHUB_HEADERS = (token: string) => ({
@@ -71,63 +60,31 @@ async function fetchGithubRepos(token: string): Promise<GithubRepo[]> {
   return all;
 }
 
-/**
- * Searches GitHub repositories using the Search API.
- * The token grants access to private repos the user owns/collaborates on.
- */
-async function searchGithubRepos(
-  token: string,
-  q: string,
-): Promise<GithubRepo[]> {
-  const res = await fetch(
-    `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&per_page=30&sort=updated`,
-    { headers: GITHUB_HEADERS(token) },
-  );
-  if (!res.ok) return [];
-  const body = (await res.json()) as GithubSearchResponse;
-  return body.items ?? [];
-}
-
 router.get(
   "/repos",
   asyncHandler(async (req, res) => {
     const user = req.user as Express.User;
     const q = ((req.query.q as string) ?? "").trim();
 
+    // Always fetch the user's accessible repos (owner + collaborator + org member).
+    // This list is cached for LIST_TTL so subsequent searches are instant.
     let repos: GithubRepo[];
-
-    if (q.length >= 2) {
-      // Use GitHub Search API — searches accessible repos by keyword
-      const userMap =
-        searchCache.get(user.id) ??
-        new Map<string, { ts: number; data: GithubRepo[] }>();
-      const cached = userMap.get(q);
-
-      if (cached && Date.now() - cached.ts < SEARCH_TTL) {
-        repos = cached.data;
-      } else {
-        repos = await searchGithubRepos(user.access_token, q);
-        userMap.set(q, { ts: Date.now(), data: repos });
-        searchCache.set(user.id, userMap);
-      }
+    const cached = listCache.get(user.id);
+    if (cached && Date.now() - cached.ts < LIST_TTL) {
+      repos = cached.data;
     } else {
-      // No query — return recently-pushed repos from the user's list
-      const cached = listCache.get(user.id);
-      if (cached && Date.now() - cached.ts < LIST_TTL) {
-        repos = cached.data;
-      } else {
-        repos = await fetchGithubRepos(user.access_token);
-        listCache.set(user.id, { ts: Date.now(), data: repos });
-      }
-      // Narrow by single char if provided
-      if (q.length === 1) {
-        const term = q.toLowerCase();
-        repos = repos.filter(
-          (r) =>
-            r.full_name.toLowerCase().includes(term) ||
-            (r.description ?? "").toLowerCase().includes(term),
-        );
-      }
+      repos = await fetchGithubRepos(user.access_token);
+      listCache.set(user.id, { ts: Date.now(), data: repos });
+    }
+
+    // Filter locally so results are always scoped to the user's repos.
+    if (q.length > 0) {
+      const term = q.toLowerCase();
+      repos = repos.filter(
+        (r) =>
+          r.full_name.toLowerCase().includes(term) ||
+          (r.description ?? "").toLowerCase().includes(term),
+      );
     }
 
     res.json({ data: repos.slice(0, 30) });
