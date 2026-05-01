@@ -36,6 +36,7 @@ export interface Project {
   created_at: string;
   updated_at: string;
   repos?: Repo[];
+  repo_count?: number;
 }
 
 export interface DeployJob {

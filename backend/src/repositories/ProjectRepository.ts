@@ -23,7 +23,8 @@ export class ProjectRepository {
   async findAllByUser(userId: number): Promise<Project[]> {
     return db
       .prepare(
-        `SELECT DISTINCT p.*
+        `SELECT DISTINCT p.*,
+                (SELECT COUNT(*) FROM repos WHERE project_id = p.id) AS repo_count
            FROM projects p
            LEFT JOIN project_members pm ON pm.project_id = p.id
           WHERE p.owner_id = ? OR pm.user_id = ?

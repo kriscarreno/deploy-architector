@@ -176,14 +176,27 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
 }
 
 // Panel de despliegue
-function DeployPanel({ status, jobData }) {
+interface DeployPanelProps {
+  status: string;
+  jobData: import("../types").DeployJob | null;
+  checking: boolean;
+  onCheck: () => void;
+  onReset: () => void;
+}
+
+function DeployPanel({
+  status,
+  jobData,
+  checking,
+  onCheck,
+  onReset,
+}: DeployPanelProps) {
   if (status === JOB_STATUS.IDLE) return null;
 
-  // Backend devuelve `log` como string con saltos de línea
   const logText: string = jobData?.log ?? "";
   const logLines: string[] = logText ? logText.split("\n").filter(Boolean) : [];
-  const progress: number =
-    jobData?.progress ?? (status === JOB_STATUS.SUCCESS ? 100 : 0);
+  const isFinished =
+    status === JOB_STATUS.SUCCESS || status === JOB_STATUS.FAILED;
 
   return (
     <div className="mt-6 rounded-xl border border-dark-border bg-dark-bg p-5">
@@ -192,27 +205,16 @@ function DeployPanel({ status, jobData }) {
         <Badge label={status} variant={statusVariant[status] ?? "gray"} />
       </div>
 
-      <div
-        className="mb-3 h-2 w-full overflow-hidden rounded-full bg-dark-border"
-        role="progressbar"
-        aria-valuenow={progress}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-primary-500 transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
+      <div className="mb-4 flex items-center gap-3">
+        {!isFinished && (
+          <Button variant="secondary" loading={checking} onClick={onCheck}>
+            {checking ? "Consultando…" : "Actualizar estado"}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onReset}>
+          Cerrar
+        </Button>
       </div>
-
-      {jobData?.currentRepo && (
-        <p className="mb-3 text-xs text-slate-400">
-          Desplegando:{" "}
-          <span className="font-mono text-primary-300">
-            {jobData.currentRepo}
-          </span>
-        </p>
-      )}
 
       {logLines.length > 0 && (
         <div
@@ -254,7 +256,8 @@ function ProjectDetailPage() {
     clearSelectedProject,
   } = useProjectStore();
 
-  const { deploy, status, jobData, isDeploying } = useDeploy(id);
+  const { deploy, status, jobData, isDeploying, checking, checkStatus, reset } =
+    useDeploy(id);
 
   useEffect(() => {
     fetchProject(id);
@@ -404,7 +407,13 @@ function ProjectDetailPage() {
         />
       </div>
 
-      <DeployPanel status={status} jobData={jobData} />
+      <DeployPanel
+        status={status}
+        jobData={jobData}
+        checking={checking}
+        onCheck={checkStatus}
+        onReset={reset}
+      />
 
       <AddRepoModal
         isOpen={addRepoOpen}

@@ -25,6 +25,8 @@ export interface Project {
   atomic: number;
   created_at: string;
   updated_at: string;
+  /** Only present in list queries (COUNT subquery) */
+  repo_count?: number;
 }
 
 export interface Repo {

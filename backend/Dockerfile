@@ -31,6 +31,11 @@ COPY --from=builder /app/.env ./.env
 # Data directory for SQLite and cloned repos
 RUN mkdir -p data/repos
 
+# Script de arranque: lanza server + worker juntos.
+# Si cualquiera muere, el otro continúa; Docker reiniciará el contenedor.
+RUN printf '#!/bin/sh\nnode dist/server.js &\nnode dist/workers/deployWorker.js\n' > /app/start.sh \
+  && chmod +x /app/start.sh
+
 EXPOSE 3000
 
-CMD ["node", "dist/server.js"]
+CMD ["/app/start.sh"]
