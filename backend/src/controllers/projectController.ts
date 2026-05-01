@@ -36,6 +36,7 @@ const addRepoSchema = Joi.object({
   order: Joi.number().integer().min(0).default(0),
   main_url: Joi.string().uri().allow("", null).default(null),
   prod_url: Joi.string().uri().allow("", null).default(null),
+  workflow_file: Joi.string().trim().max(200).default("deploy.yml"),
 });
 
 const updateRepoSchema = Joi.object({
@@ -45,6 +46,7 @@ const updateRepoSchema = Joi.object({
   order: Joi.number().integer().min(0),
   main_url: Joi.string().uri().allow("", null),
   prod_url: Joi.string().uri().allow("", null),
+  workflow_file: Joi.string().trim().max(200),
 });
 
 function validate(schema, data) {
@@ -109,6 +111,7 @@ export function makeProjectController(projectService) {
           orderIndex: data.order,
           mainUrl: data.main_url ?? null,
           prodUrl: data.prod_url ?? null,
+          workflowFile: data.workflow_file,
         },
       );
       res.status(201).json({ data: repo });
@@ -166,6 +169,7 @@ export function makeProjectController(projectService) {
           orderIndex: data.order,
           mainUrl: "main_url" in data ? (data.main_url ?? null) : undefined,
           prodUrl: "prod_url" in data ? (data.prod_url ?? null) : undefined,
+          workflowFile: data.workflow_file,
         },
       );
       res.json({ data: repo });

@@ -42,6 +42,7 @@ export function makeProjectRouter(projectCtrl, deployCtrl) {
   router.get("/:id/status", asyncHandler(projectCtrl.getProjectStatus));
   router.put("/:id/cron", asyncHandler(projectCtrl.updateCronConfig));
   router.post("/:id/deploy", asyncHandler(deployCtrl.enqueueDeploy));
+  router.post("/:id/dispatch", asyncHandler(deployCtrl.dispatchWorkflow));
   router.get("/:id/deploys", asyncHandler(deployCtrl.getDeployHistory));
 
   return router;

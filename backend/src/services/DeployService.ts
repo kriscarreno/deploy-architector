@@ -10,6 +10,8 @@
  */
 import type { ProjectRepository } from "../repositories/ProjectRepository.js";
 import type { DeployLogRepository } from "../repositories/DeployLogRepository.js";
+import type { RepoRepository } from "../repositories/RepoRepository.js";
+import type { UserRepository } from "../repositories/UserRepository.js";
 import type Bull from "bull";
 import type { Queue } from "bull";
 import { v4 as uuidv4 } from "uuid";
@@ -19,6 +21,8 @@ import logger from "../config/logger.js";
 export class DeployService {
   private projectRepo: ProjectRepository;
   private deployLogRepo: DeployLogRepository;
+  private repoRepo: RepoRepository;
+  private userRepo: UserRepository;
   private deployQueue: Queue<{
     projectId: number;
     userId: number;
@@ -29,10 +33,14 @@ export class DeployService {
     projectRepo: ProjectRepository,
     deployLogRepo: DeployLogRepository,
     deployQueue: Queue<{ projectId: number; userId: number; jobId: string }>,
+    repoRepo: RepoRepository,
+    userRepo: UserRepository,
   ) {
     this.projectRepo = projectRepo;
     this.deployLogRepo = deployLogRepo;
     this.deployQueue = deployQueue;
+    this.repoRepo = repoRepo;
+    this.userRepo = userRepo;
   }
 
   /**
@@ -107,5 +115,84 @@ export class DeployService {
    */
   async getGlobalHistory(userId, pagination) {
     return this.deployLogRepo.findByUser(userId, pagination);
+  }
+
+  /**
+   * Triggers a GitHub Actions workflow_dispatch event for all repos in a
+   * project on the specified branch. Runs GitHub CI/CD exactly like a
+   * manual trigger from the GitHub UI.
+   *
+   * @returns Array of per-repo results { repoId, name, success, status }
+   */
+  async dispatchWorkflow(projectId: number, userId: number, branch: string) {
+    const project = await this.projectRepo.findById(projectId);
+    if (!project) throw new NotFoundError("Project not found");
+
+    const member = await this.projectRepo.isMember(projectId, userId);
+    if (!member) throw new ForbiddenError();
+
+    const repos = await this.repoRepo.findAllByProject(projectId);
+    const user = await this.userRepo.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
+
+    const results = await Promise.all(
+      repos.map(async (repo) => {
+        const repoUrl = repo.github_url.endsWith(".git")
+          ? repo.github_url
+          : `${repo.github_url}.git`;
+        const url = new URL(repoUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const owner = parts[0];
+        const repoName = parts[1]?.replace(/\.git$/, "");
+
+        const workflowFile = repo.workflow_file || "deploy.yml";
+
+        try {
+          const resp = await fetch(
+            `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflowFile}/dispatches`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${user.access_token}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ ref: branch }),
+            },
+          );
+
+          const success = resp.status === 204;
+          if (!success) {
+            const body = await resp.text().catch(() => "");
+            logger.warn("workflow_dispatch failed", {
+              repoId: repo.id,
+              status: resp.status,
+              body,
+            });
+          }
+          return {
+            repoId: repo.id,
+            name: repo.name,
+            success,
+            httpStatus: resp.status,
+          };
+        } catch (err: any) {
+          logger.error("workflow_dispatch error", {
+            repoId: repo.id,
+            err: err.message,
+          });
+          return {
+            repoId: repo.id,
+            name: repo.name,
+            success: false,
+            httpStatus: 0,
+          };
+        }
+      }),
+    );
+
+    logger.info("workflow_dispatch triggered", { projectId, userId, branch });
+    return results;
   }
 }

@@ -16,6 +16,7 @@ import Badge, { statusVariant } from "../components/common/Badge";
 import RepoAutocomplete from "../components/common/RepoAutocomplete";
 import { branchRules, orderRules } from "../utils/validators";
 import projectService from "../services/projectService";
+import deployService from "../services/deployService";
 import envVarService from "../services/envVarService";
 import type { EnvVar, EnvBranch } from "../types";
 
@@ -97,6 +98,19 @@ function RepoFormFields({ register, errors, control }) {
           })}
         />
       </div>
+      <Input
+        id="workflow-file"
+        label="Archivo de workflow"
+        placeholder="deploy.yml"
+        hint="Nombre del archivo en .github/workflows/ para deploy manual"
+        error={errors.workflow_file?.message}
+        {...register("workflow_file", {
+          pattern: {
+            value: /^[\w.-]+\.ya?ml$/,
+            message: "Debe ser un archivo .yml o .yaml",
+          },
+        })}
+      />
     </>
   );
 }
@@ -125,6 +139,9 @@ function AddRepoModal({
       main_branch: "main",
       production_branch: "production",
       order: nextOrder,
+      main_url: "",
+      prod_url: "",
+      workflow_file: "deploy.yml",
     },
   });
 
@@ -136,6 +153,9 @@ function AddRepoModal({
         main_branch: "main",
         production_branch: "production",
         order: nextOrder,
+        main_url: "",
+        prod_url: "",
+        workflow_file: "deploy.yml",
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, nextOrder]);
@@ -203,6 +223,7 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
         order: repo.order_index,
         main_url: repo.main_url ?? "",
         prod_url: repo.prod_url ?? "",
+        workflow_file: repo.workflow_file ?? "deploy.yml",
       });
     }
   }, [repo, reset]);
@@ -236,6 +257,176 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
       >
         <RepoFormFields register={register} errors={errors} control={control} />
       </form>
+    </Modal>
+  );
+}
+
+// Modal: deploy manual de rama (workflow_dispatch)
+function DispatchModal({
+  isOpen,
+  onClose,
+  repos,
+  projectId,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  repos: {
+    name: string;
+    github_url: string;
+    main_branch: string;
+    prod_branch: string;
+    workflow_file: string;
+  }[];
+  projectId: string;
+}) {
+  const defaultBranch = repos[0]?.main_branch ?? "main";
+  const [branch, setBranch] = useState(defaultBranch);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<
+    { name: string; success: boolean; httpStatus: number }[] | null
+  >(null);
+  const { toastSuccess, toastError } = useToast();
+
+  // Reset when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setBranch(repos[0]?.main_branch ?? "main");
+      setResults(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const handleDispatch = async () => {
+    if (!branch.trim()) return;
+    setLoading(true);
+    setResults(null);
+    try {
+      const data = await deployService.dispatch(projectId, branch.trim());
+      setResults(data);
+      const allOk = data.every((r) => r.success);
+      if (allOk) toastSuccess("Workflow lanzado en todos los repos");
+      else toastError("Algunos workflows fallaron — revisa los resultados");
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Unique branches across repos for quick selection
+  const branchOptions = Array.from(
+    new Set(repos.flatMap((r) => [r.main_branch, r.prod_branch])),
+  );
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Deploy manual de rama"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            {results ? "Cerrar" : "Cancelar"}
+          </Button>
+          {!results && (
+            <Button
+              onClick={handleDispatch}
+              loading={loading}
+              disabled={loading || !branch.trim()}
+            >
+              Lanzar workflow
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-slate-400">
+          Lanza un{" "}
+          <span className="font-mono text-slate-200">workflow_dispatch</span> de
+          GitHub Actions en la rama seleccionada — equivale al botón{" "}
+          <em>"Run workflow"</em> de la UI de GitHub.
+        </p>
+
+        {!results && (
+          <>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">
+                Rama
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={branchOptions.includes(branch) ? branch : "__custom__"}
+                  onChange={(e) => {
+                    if (e.target.value !== "__custom__")
+                      setBranch(e.target.value);
+                  }}
+                  className="rounded-lg border border-dark-border bg-dark-bg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {branchOptions.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                  <option value="__custom__">Otra…</option>
+                </select>
+                <input
+                  type="text"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  placeholder="nombre-de-rama"
+                  className="flex-1 rounded-lg border border-dark-border bg-dark-bg px-3 py-2 font-mono text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-dark-border bg-dark-surface p-3">
+              <p className="mb-2 text-xs font-semibold text-slate-400">
+                Workflows configurados por repo:
+              </p>
+              <div className="flex flex-col gap-1">
+                {repos.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-300 truncate">
+                      {r.name ?? r.github_url?.split("/").pop()}
+                    </span>
+                    <span className="text-slate-600">→</span>
+                    <span className="font-mono text-primary-300">
+                      .github/workflows/{r.workflow_file || "deploy.yml"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {results && (
+          <div className="flex flex-col gap-2">
+            {results.map((r, i) => (
+              <div
+                key={i}
+                className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                  r.success
+                    ? "border-green-800/40 bg-green-950/20"
+                    : "border-red-800/40 bg-red-950/20"
+                }`}
+              >
+                <span className="text-sm text-slate-200">{r.name}</span>
+                {r.success ? (
+                  <span className="text-xs font-semibold text-green-400">
+                    ✓ Lanzado
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-red-400">
+                    ✗ Error (HTTP {r.httpStatus})
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
@@ -935,6 +1126,7 @@ function ProjectDetailPage() {
   const { id } = useParams();
   const [addRepoOpen, setAddRepoOpen] = useState(false);
   const [editRepo, setEditRepo] = useState(null);
+  const [dispatchOpen, setDispatchOpen] = useState(false);
   const [envVarsRepo, setEnvVarsRepo] = useState<{
     id: number;
     name: string;
@@ -1171,6 +1363,14 @@ function ProjectDetailPage() {
             + Añadir repo
           </Button>
           <Button
+            variant="secondary"
+            onClick={() => setDispatchOpen(true)}
+            disabled={(project.repos?.length ?? 0) === 0}
+            title="Lanzar workflow de GitHub Actions manualmente en una rama"
+          >
+            Deploy rama
+          </Button>
+          <Button
             onClick={deploy}
             loading={isDeploying}
             disabled={isDeploying || (project.repos?.length ?? 0) === 0}
@@ -1272,6 +1472,12 @@ function ProjectDetailPage() {
         onClose={() => setEditRepo(null)}
         onSubmit={handleEditRepo}
         repo={editRepo}
+      />
+      <DispatchModal
+        isOpen={dispatchOpen}
+        onClose={() => setDispatchOpen(false)}
+        repos={project.repos ?? []}
+        projectId={id!}
       />
       <EnvVarsModal
         isOpen={Boolean(envVarsRepo)}

@@ -6,13 +6,26 @@ import apiClient from "./apiClient";
 
 const deployService = {
   /**
-   * Inicia el despliegue de un proyecto.
+   * Inicia el despliegue de un proyecto (merge main → prod).
    * @param {string} projectId
    * @returns {Promise<{ jobId: string }>}
    */
   trigger(projectId) {
     return apiClient
       .post(`/api/projects/${projectId}/deploy`)
+      .then((r) => r.data.data);
+  },
+
+  /**
+   * Lanza un workflow_dispatch de GitHub Actions en todos los repos del proyecto
+   * sobre la rama indicada. Equivale al "Run workflow" manual de GitHub.
+   * @param {string|number} projectId
+   * @param {string} branch  Rama sobre la que ejecutar el workflow
+   * @returns {Promise<Array<{ repoId: number; name: string; success: boolean; httpStatus: number }>>}
+   */
+  dispatch(projectId, branch: string) {
+    return apiClient
+      .post(`/api/projects/${projectId}/dispatch`, { branch })
       .then((r) => r.data.data);
   },
 

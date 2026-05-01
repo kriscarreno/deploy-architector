@@ -70,6 +70,8 @@ const deployService = new DeployService(
   projectRepo,
   deployLogRepo,
   deployQueue,
+  repoRepo,
+  userRepo,
 );
 const envVarService = new EnvVarService(envVarRepo, repoRepo, projectRepo);
 

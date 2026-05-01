@@ -43,6 +43,7 @@ export interface Repo {
   main_branch: string;
   main_url: string | null;
   prod_url: string | null;
+  workflow_file: string;
   local_path: string | null;
   created_at: string;
   updated_at: string;

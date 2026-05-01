@@ -25,6 +25,19 @@ export function makeDeployController(deployService) {
       res.status(202).json({ data: result });
     },
 
+    async dispatchWorkflow(req, res) {
+      const { branch } = req.body;
+      if (!branch || typeof branch !== "string" || !branch.trim()) {
+        return res.status(400).json({ error: "branch is required" });
+      }
+      const results = await deployService.dispatchWorkflow(
+        Number(req.params.id),
+        req.user.id,
+        branch.trim(),
+      );
+      res.json({ data: results });
+    },
+
     async getJobStatus(req, res) {
       const status = await deployService.getJobStatus(
         req.params.jobId,
