@@ -128,10 +128,8 @@ export async function mergeAndPush(
   // Ensure the authenticated remote URL is set before any network operation
   await git.remote(["set-url", "origin", authUrl]);
 
-  // 1. git checkout {prod_branch}
-  await git.checkout(prodBranch);
-
-  // 2. Sync local prod with remote prod (rebase)
+  // 1. Checkout main and sync with origin
+  await git.checkout(mainBranch);
   try {
     await git.pull(["--rebase"]);
   } catch (pullErr) {
@@ -141,13 +139,13 @@ export async function mergeAndPush(
       ? `Conflicting files: ${files.join(", ")}`
       : pullErr.message;
     throw new Error(
-      `[${repoLabel}] CONFLICT syncing ${prodBranch} with origin/${prodBranch}. ${detail}`,
+      `[${repoLabel}] CONFLICT syncing ${mainBranch} with origin/${mainBranch}. ${detail}`,
     );
   }
 
-  // 3. Rebase prod onto main
+  // 2. Rebase main onto production (incorporates any direct commits on prod)
   try {
-    await git.pull(["--rebase", "origin", mainBranch]);
+    await git.pull(["--rebase", "origin", prodBranch]);
   } catch (rebaseErr) {
     const files = await conflictedFiles(git);
     await safeAbortRebase(git);
@@ -155,16 +153,25 @@ export async function mergeAndPush(
       ? `\nConflicting files:\n${files.map((f) => `  • ${f}`).join("\n")}`
       : `\nGit output: ${rebaseErr.message}`;
     throw new Error(
-      `[${repoLabel}] CONFLICT rebasing ${prodBranch} onto ${mainBranch}.${fileList}`,
+      `[${repoLabel}] CONFLICT rebasing ${mainBranch} onto ${prodBranch}.${fileList}`,
     );
   }
 
-  // 4. git push -f
+  // 3. Force-push main (rebase rewrote history)
   try {
-    await git.push(["--force"]);
+    await git.push(["--force-with-lease", "origin", mainBranch]);
   } catch (pushErr) {
     throw new Error(
-      `[${repoLabel}] ERROR pushing ${prodBranch} to origin: ${pushErr.message}`,
+      `[${repoLabel}] ERROR force-pushing ${mainBranch} to origin: ${pushErr.message}`,
+    );
+  }
+
+  // 4. Advance production to main via fast-forward refspec (no checkout needed)
+  try {
+    await git.push(["origin", `${mainBranch}:${prodBranch}`]);
+  } catch (pushErr) {
+    throw new Error(
+      `[${repoLabel}] ERROR advancing ${prodBranch} to ${mainBranch}: ${pushErr.message}`,
     );
   }
 }
