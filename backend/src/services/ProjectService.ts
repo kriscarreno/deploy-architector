@@ -11,6 +11,7 @@
 import type { ProjectRepository } from "../repositories/ProjectRepository.js";
 import type { RepoRepository } from "../repositories/RepoRepository.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
+import { cloneOrFetch, getDiffSummary } from "../utils/gitHelper.js";
 
 export class ProjectService {
   private projectRepo: ProjectRepository;
@@ -86,5 +87,34 @@ export class ProjectService {
     if (!repo || repo.project_id !== projectId)
       throw new NotFoundError("Repo not found");
     return this.repoRepo.update(repoId, data);
+  }
+
+  async getRepoDiffs(projectId: number, userId: number, accessToken: string) {
+    await this.getProject(projectId, userId); // ensures access
+    const repos = await this.repoRepo.findAllByProject(projectId);
+
+    const results = await Promise.all(
+      repos.map(async (repo) => {
+        try {
+          const git = await cloneOrFetch(repo, accessToken);
+          const diff = await getDiffSummary(
+            git,
+            repo.main_branch,
+            repo.prod_branch,
+          );
+          const upToDate = diff.includes("identical");
+          return { repoId: repo.id, name: repo.name, diff, upToDate };
+        } catch (err: any) {
+          return {
+            repoId: repo.id,
+            name: repo.name,
+            diff: `Error al obtener diff: ${err.message}`,
+            upToDate: false,
+          };
+        }
+      }),
+    );
+
+    return results;
   }
 }

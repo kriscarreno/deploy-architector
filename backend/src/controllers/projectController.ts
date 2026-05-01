@@ -156,5 +156,14 @@ export function makeProjectController(projectService) {
       );
       res.json({ data: repo });
     },
+
+    async getProjectDiff(req, res) {
+      const diffs = await projectService.getRepoDiffs(
+        Number(req.params.id),
+        req.user.id,
+        req.user.access_token,
+      );
+      res.json({ data: diffs });
+    },
   };
 }

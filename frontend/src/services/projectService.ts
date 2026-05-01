@@ -81,6 +81,25 @@ const projectService = {
       .put(`/api/projects/${projectId}/repos/${repoId}`, payload)
       .then((r) => r.data.data);
   },
+
+  /**
+   * Obtiene el diff summary (commits pendientes) de cada repo del proyecto.
+   * Hace clone/fetch en el servidor, puede tardar unos segundos.
+   * @param {string|number} projectId
+   */
+  getDiff(projectId) {
+    return apiClient
+      .get(`/api/projects/${projectId}/diff`)
+      .then(
+        (r) =>
+          r.data.data as Array<{
+            repoId: number;
+            name: string;
+            diff: string;
+            upToDate: boolean;
+          }>,
+      );
+  },
 };
 
 export default projectService;

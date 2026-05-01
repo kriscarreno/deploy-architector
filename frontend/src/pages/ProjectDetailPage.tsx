@@ -12,6 +12,7 @@ import Table from "../components/common/Table";
 import Spinner from "../components/common/Spinner";
 import Badge, { statusVariant } from "../components/common/Badge";
 import { branchRules, orderRules } from "../utils/validators";
+import projectService from "../services/projectService";
 
 // Shared repo form fields
 function RepoFormFields({ register, errors }) {
@@ -258,6 +259,28 @@ function ProjectDetailPage() {
 
   const { deploy, status, streamLines, isDeploying, reset } = useDeploy(id);
 
+  type RepoDiff = {
+    repoId: number;
+    name: string;
+    diff: string;
+    upToDate: boolean;
+  };
+  const [diffs, setDiffs] = useState<RepoDiff[] | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  const checkDiff = async () => {
+    setDiffLoading(true);
+    setDiffs(null);
+    try {
+      const result = await projectService.getDiff(id);
+      setDiffs(result);
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setDiffLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchProject(id);
     return clearSelectedProject;
@@ -404,6 +427,66 @@ function ProjectDetailPage() {
           data={project.repos ?? []}
           emptyMessage="Sin repositorios. Añade el primero para poder desplegar."
         />
+      </div>
+
+      {/* Cambios pendientes */}
+      <div className="mt-6 card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
+            Cambios pendientes
+          </h2>
+          <Button
+            variant="ghost"
+            onClick={checkDiff}
+            loading={diffLoading}
+            disabled={diffLoading || (project.repos?.length ?? 0) === 0}
+          >
+            {diffLoading
+              ? "Verificando..."
+              : diffs
+                ? "Actualizar"
+                : "Ver cambios"}
+          </Button>
+        </div>
+
+        {!diffs && !diffLoading && (
+          <p className="mt-3 text-sm text-slate-500">
+            Haz clic en "Ver cambios" para comparar main con producción en cada
+            repo.
+          </p>
+        )}
+
+        {diffs && (
+          <div className="mt-4 flex flex-col gap-4">
+            {diffs.map((r) => (
+              <div
+                key={r.repoId}
+                className={`rounded-lg border p-4 ${
+                  r.upToDate
+                    ? "border-green-800/40 bg-green-950/20"
+                    : "border-yellow-800/40 bg-yellow-950/20"
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      r.upToDate ? "bg-green-400" : "bg-yellow-400"
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-slate-200">
+                    {r.name}
+                  </span>
+                  {r.upToDate && (
+                    <span className="text-xs text-green-400">Al día</span>
+                  )}
+                </div>
+                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-300">
+                  {r.diff}
+                </pre>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <DeployPanel status={status} streamLines={streamLines} onReset={reset} />
