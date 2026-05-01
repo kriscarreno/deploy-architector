@@ -26,6 +26,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/.env ./.env
 
 # Data directory for SQLite and cloned repos
 RUN mkdir -p data/repos
