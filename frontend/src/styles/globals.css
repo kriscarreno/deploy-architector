@@ -2,6 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Driver.js styles */
+@import "driver.js/dist/driver.css";
+
+/* Dark theme overrides for Driver.js */
+.driverjs-dark-theme {
+  --driver-popover-bg: #1e293b;
+  --driver-popover-border: #334155;
+}
+.driverjs-dark-theme .driver-popover-title {
+  color: #f1f5f9;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.driverjs-dark-theme .driver-popover-description {
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.driverjs-dark-theme .driver-popover-next-btn,
+.driverjs-dark-theme .driver-popover-done-btn {
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.driverjs-dark-theme .driver-popover-prev-btn {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.driverjs-dark-theme .driver-popover-progress-text {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
 @layer base {
   :root {
     --scrollbar-thumb: #334155;

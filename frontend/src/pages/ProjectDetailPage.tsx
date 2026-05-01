@@ -5,6 +5,7 @@ import cronstrue from "cronstrue";
 import useProjectStore from "../store/projectStore";
 import useDeploy, { JOB_STATUS } from "../hooks/useDeploy";
 import useToast from "../hooks/useToast";
+import { useProjectTour } from "../hooks/useProjectTour";
 import { getErrorMessage } from "../utils/errorHandler";
 import Button from "../components/common/Button";
 import Modal from "../components/common/Modal";
@@ -312,7 +313,7 @@ function CronPanel({
   };
 
   return (
-    <div className="mt-6 card">
+    <div id="tour-cron-section" className="mt-6 card">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
@@ -430,6 +431,7 @@ function ProjectDetailPage() {
   const [addRepoOpen, setAddRepoOpen] = useState(false);
   const [editRepo, setEditRepo] = useState(null);
   const { toastSuccess, toastError } = useToast();
+  const { startTour } = useProjectTour();
   const {
     selectedProject: project,
     detailLoading,
@@ -614,14 +616,25 @@ function ProjectDetailPage() {
         <span className="text-slate-300">{project.name}</span>
       </nav>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div
+        id="tour-project-header"
+        className="mb-6 flex flex-wrap items-start justify-between gap-4"
+      >
         <div>
           <h1 className="text-2xl font-bold text-white">{project.name}</h1>
           {project.description && (
             <p className="mt-1 text-sm text-slate-400">{project.description}</p>
           )}
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={startTour}
+            title="Ver tutorial"
+            aria-label="Ver tutorial guiado"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-dark-border bg-dark-surface text-slate-400 hover:border-primary-500 hover:text-primary-400 transition-colors text-sm font-semibold"
+          >
+            ?
+          </button>
           <Button variant="secondary" onClick={() => setAddRepoOpen(true)}>
             + Añadir repo
           </Button>
@@ -636,7 +649,7 @@ function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div id="tour-repo-table" className="card">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
           Repositorios ({project.repos?.length ?? 0})
         </h2>
@@ -648,7 +661,7 @@ function ProjectDetailPage() {
       </div>
 
       {/* Cambios pendientes */}
-      <div className="mt-6 card">
+      <div id="tour-diff-section" className="mt-6 card">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
             Cambios pendientes
