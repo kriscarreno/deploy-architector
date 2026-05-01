@@ -179,8 +179,11 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
 function DeployPanel({ status, jobData }) {
   if (status === JOB_STATUS.IDLE) return null;
 
-  const logs = jobData?.logs ?? [];
-  const progress = jobData?.progress ?? 0;
+  // Backend devuelve `log` como string con saltos de línea
+  const logText: string = jobData?.log ?? "";
+  const logLines: string[] = logText ? logText.split("\n").filter(Boolean) : [];
+  const progress: number =
+    jobData?.progress ?? (status === JOB_STATUS.SUCCESS ? 100 : 0);
 
   return (
     <div className="mt-6 rounded-xl border border-dark-border bg-dark-bg p-5">
@@ -211,13 +214,13 @@ function DeployPanel({ status, jobData }) {
         </p>
       )}
 
-      {logs.length > 0 && (
+      {logLines.length > 0 && (
         <div
           className="max-h-64 overflow-y-auto rounded-lg bg-black/60 p-3 font-mono text-xs text-green-300"
           aria-live="polite"
           aria-label="Logs del despliegue"
         >
-          {logs.map((line, i) => (
+          {logLines.map((line, i) => (
             <div key={i}>{line}</div>
           ))}
         </div>

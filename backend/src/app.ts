@@ -95,11 +95,24 @@ app.use(
 app.use(compression());
 
 // ── Rate limiting ─────────────────────────────────────────────────────────
+// keyGenerator extrae la IP real del cliente aunque estemos detrás de
+// CapRover (nginx → Docker → app). express-rate-limit por defecto usa
+// req.ip, que con trust proxy=1 ya debería ser la IP real, pero si hay
+// más capas de proxy lo resolvemos explícitamente desde X-Forwarded-For.
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 1000, // 1000 req / 15 min por IP (~1 req/s)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) {
+      const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+      // El primer IP de la lista es el cliente original
+      return ips.split(",")[0].trim();
+    }
+    return req.socket.remoteAddress ?? "unknown";
+  },
   message: { error: { code: "RATE_LIMITED", message: "Too many requests" } },
 });
 app.use("/api/", limiter);
