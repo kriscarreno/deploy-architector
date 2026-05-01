@@ -12,7 +12,7 @@ const authService = {
    * El backend maneja el callback y establece la cookie de sesión.
    */
   loginWithGitHub() {
-    window.location.href = `${BASE_URL}auth/github`;
+    window.location.href = `${BASE_URL}auth/github/callback`;
   },
 
   /**
