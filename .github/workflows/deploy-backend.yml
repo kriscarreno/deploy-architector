@@ -32,6 +32,7 @@ jobs:
           echo "LOG_LEVEL=info" >> .env
           echo "REPOS_BASE_DIR=./data/repos" >> .env
           echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
+          echo "ALLOWED_ORIGINS=${{ secrets.FRONTEND_URL }}" >> .env
 
       - name: Create deploy.tar for CapRover
         run: |
