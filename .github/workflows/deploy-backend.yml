@@ -1,0 +1,51 @@
+name: Deploy Backend to CapRover
+
+on:
+  push:
+    branches: ['production']
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    environment: production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create .env file from secrets
+        working-directory: backend
+        run: |
+          echo "NODE_ENV=production" >> .env
+          echo "PORT=3000" >> .env
+          echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> .env
+          echo "GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}" >> .env
+          echo "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}" >> .env
+          echo "GITHUB_CALLBACK_URL=${{ secrets.GITHUB_CALLBACK_URL }}" >> .env
+          echo "DB_PATH=./data/deploy_orchestrator.db" >> .env
+          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
+          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
+          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+          echo "LOG_LEVEL=info" >> .env
+          echo "REPOS_BASE_DIR=./data/repos" >> .env
+          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
+
+      - name: Create deploy.tar for CapRover
+        run: |
+          tar --exclude='.git' \
+              --exclude='.github' \
+              --exclude='backend/node_modules' \
+              --exclude='frontend' \
+              --exclude='deploy.tar' \
+              -cvf deploy.tar \
+              -C backend .
+
+      - name: Deploy to CapRover
+        uses: caprover/deploy-from-github@v1.1.2
+        with:
+          server: '${{ secrets.CAPROVER_SERVER }}'
+          app: '${{ secrets.APP_NAME_BACKEND }}'
+          token: '${{ secrets.APP_TOKEN_BACKEND }}'

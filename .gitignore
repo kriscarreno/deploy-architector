@@ -1,0 +1,14 @@
+# Root
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+*node_modules/
+*dist/
+*data

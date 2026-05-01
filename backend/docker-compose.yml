@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  # ── Redis ──────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: deploy_orchestrator_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # ── API server (optional — remove if running locally with `npm start`) ──
+  # api:
+  #   build: .
+  #   container_name: deploy_orchestrator_api
+  #   restart: unless-stopped
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     # Persist SQLite DB and cloned repos outside the container
+  #     - ./data:/app/data
+  #   command: node src/server.js
+
+  # ── Worker (optional) ───────────────────────────────────────────────────
+  # worker:
+  #   build: .
+  #   container_name: deploy_orchestrator_worker
+  #   restart: unless-stopped
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./data:/app/data
+  #   command: node src/workers/deployWorker.js
+
+volumes:
+  redis_data:

@@ -1,0 +1,273 @@
+openapi: 3.0.3
+info:
+  title: Deploy Orchestrator API
+  version: 1.0.0
+  description: |
+    REST API for orchestrating multi-repo GitHub deployments.
+    Authentication is session-based (GitHub OAuth).
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Auth
+  - name: Projects
+  - name: Repos
+  - name: Deploys
+
+paths:
+  /auth/github:
+    get:
+      tags: [Auth]
+      summary: Redirect to GitHub OAuth
+      responses:
+        "302":
+          description: Redirect to GitHub
+
+  /auth/github/callback:
+    get:
+      tags: [Auth]
+      summary: GitHub OAuth callback
+      responses:
+        "200":
+          description: Authenticated
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user info
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: List projects accessible to the authenticated user
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: List of projects
+    post:
+      tags: [Projects]
+      summary: Create a new project
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProject"
+      responses:
+        "201":
+          description: Created project
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/projects/{id}/repos:
+    get:
+      tags: [Repos]
+      summary: List repos in a project
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: List of repos
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Repos]
+      summary: Add a repo to a project
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddRepo"
+      responses:
+        "201":
+          description: Created repo
+
+  /api/projects/{id}/deploy:
+    post:
+      tags: [Deploys]
+      summary: Enqueue a deployment for all repos in the project
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "202":
+          description: Job enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      jobId:
+                        type: string
+                        format: uuid
+
+  /api/projects/{id}/deploys:
+    get:
+      tags: [Deploys]
+      summary: Get deployment history for a project
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of deploy log entries
+
+  /api/jobs/{jobId}:
+    get:
+      tags: [Deploys]
+      summary: Get status of a deploy job
+      security:
+        - sessionAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job status
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+
+  parameters:
+    ProjectId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    CreateProject:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        atomic:
+          type: boolean
+          default: false
+
+    AddRepo:
+      type: object
+      required: [githubUrl, name]
+      properties:
+        githubUrl:
+          type: string
+          format: uri
+          example: https://github.com/owner/repo
+        name:
+          type: string
+        orderIndex:
+          type: integer
+          minimum: 0
+          default: 0
+        prodBranch:
+          type: string
+          default: production
+        mainBranch:
+          type: string
+          default: main
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: UNAUTHORIZED
+                  message:
+                    type: string
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: VALIDATION_ERROR
+                  details:
+                    type: array
+                    items:
+                      type: string
