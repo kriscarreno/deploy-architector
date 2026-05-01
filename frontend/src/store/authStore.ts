@@ -50,12 +50,11 @@ const useAuthStore = create<AuthState>()(
        * Cierra la sesión.
        */
       logout: async () => {
+        set({ user: null }); // Limpiar inmediatamente para evitar re-renders con estado stale
         try {
           await authService.logout();
         } catch {
           // Continuar aunque falle el backend
-        } finally {
-          set({ user: null });
         }
       },
 

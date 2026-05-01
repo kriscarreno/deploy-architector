@@ -26,6 +26,8 @@ function useAuth() {
   // Escucha el evento disparado por el interceptor Axios ante un 401
   useEffect(() => {
     const handleUnauthorized = () => {
+      // Si el usuario ya está null, no hacer nada (evita manejar el evento varias veces)
+      if (!useAuthStore.getState().user) return;
       useAuthStore.getState().logout();
       navigate("/login", { replace: true });
     };

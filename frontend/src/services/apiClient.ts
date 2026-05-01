@@ -28,8 +28,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Borrar estado de auth en store (evitamos import circular usando evento)
-      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      // No disparar el evento para el endpoint de logout (evita bucle infinito)
+      const url: string = error.config?.url ?? "";
+      if (!url.endsWith("/auth/logout")) {
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      }
     }
     return Promise.reject(error);
   },
