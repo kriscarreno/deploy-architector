@@ -24,10 +24,13 @@
 import { config } from "dotenv";
 config();
 
+import fs from "fs";
+import path from "path";
 import { deployQueue } from "../queues/deployQueue.js";
 import { DeployLogRepository } from "../repositories/DeployLogRepository.js";
 import { ProjectRepository } from "../repositories/ProjectRepository.js";
 import { RepoRepository } from "../repositories/RepoRepository.js";
+import { RepoEnvFileRepository } from "../repositories/RepoEnvFileRepository.js";
 import { UserRepository } from "../repositories/UserRepository.js";
 import { LockService } from "../services/LockService.js";
 import { cloneOrFetch, mergeAndPush, localPath } from "../utils/gitHelper.js";
@@ -37,6 +40,7 @@ import logger from "../config/logger.js";
 const deployLogRepo = new DeployLogRepository();
 const projectRepo = new ProjectRepository();
 const repoRepo = new RepoRepository();
+const repoEnvFileRepo = new RepoEnvFileRepository();
 const userRepo = new UserRepository();
 const lockService = new LockService();
 
@@ -109,7 +113,24 @@ deployQueue.process(CONCURRENCY, async (job) => {
         const lp = localPath(repo.id);
         await repoRepo.updateLocalPath(repo.id, lp);
 
-        // c. Rebase prod onto main and force-push
+        // c. Write registered env files for the prod branch to disk
+        const envFiles = repoEnvFileRepo.findAllByRepoAndBranch(
+          repo.id,
+          repo.prod_branch,
+        );
+        if (envFiles.length > 0) {
+          log(
+            `[${repo.name}] Writing ${envFiles.length} env file(s) for branch "${repo.prod_branch}"...`,
+          );
+          for (const envFile of envFiles) {
+            const filePath = path.join(lp, envFile.filename);
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            fs.writeFileSync(filePath, envFile.content, "utf8");
+            log(`[${repo.name}] Written: ${envFile.filename}`);
+          }
+        }
+
+        // d. Rebase prod onto main and force-push
         log(
           `[${repo.name}] Rebasing ${repo.prod_branch} onto ${repo.main_branch} and force-pushing...`,
         );

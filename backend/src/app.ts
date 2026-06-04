@@ -25,6 +25,7 @@ import { configurePassport } from "./config/passport.js";
 import { UserRepository } from "./repositories/UserRepository.js";
 import { ProjectRepository } from "./repositories/ProjectRepository.js";
 import { RepoRepository } from "./repositories/RepoRepository.js";
+import { RepoEnvFileRepository } from "./repositories/RepoEnvFileRepository.js";
 import { DeployLogRepository } from "./repositories/DeployLogRepository.js";
 
 // Services
@@ -52,13 +53,18 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 const userRepo = new UserRepository();
 const projectRepo = new ProjectRepository();
 const repoRepo = new RepoRepository();
+const repoEnvFileRepo = new RepoEnvFileRepository();
 const deployLogRepo = new DeployLogRepository();
 
 // ── Configure Passport (inject userRepo) ──────────────────────────────────
 configurePassport(userRepo);
 
 // ── Instantiate services ──────────────────────────────────────────────────
-const projectService = new ProjectService(projectRepo, repoRepo);
+const projectService = new ProjectService(
+  projectRepo,
+  repoRepo,
+  repoEnvFileRepo,
+);
 const deployService = new DeployService(
   projectRepo,
   deployLogRepo,

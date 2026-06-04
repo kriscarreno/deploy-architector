@@ -10,15 +10,22 @@
  */
 import type { ProjectRepository } from "../repositories/ProjectRepository.js";
 import type { RepoRepository } from "../repositories/RepoRepository.js";
+import type { RepoEnvFileRepository } from "../repositories/RepoEnvFileRepository.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 
 export class ProjectService {
   private projectRepo: ProjectRepository;
   private repoRepo: RepoRepository;
+  private repoEnvFileRepo: RepoEnvFileRepository;
 
-  constructor(projectRepo: ProjectRepository, repoRepo: RepoRepository) {
+  constructor(
+    projectRepo: ProjectRepository,
+    repoRepo: RepoRepository,
+    repoEnvFileRepo: RepoEnvFileRepository,
+  ) {
     this.projectRepo = projectRepo;
     this.repoRepo = repoRepo;
+    this.repoEnvFileRepo = repoEnvFileRepo;
   }
 
   // ── Projects ─────────────────────────────────────────────────────────────
@@ -86,5 +93,41 @@ export class ProjectService {
     if (!repo || repo.project_id !== projectId)
       throw new NotFoundError("Repo not found");
     return this.repoRepo.update(repoId, data);
+  }
+
+  // ── Env files ─────────────────────────────────────────────────────────────
+
+  private async getRepoInProject(projectId, repoId, userId) {
+    await this.getProject(projectId, userId);
+    const repo = await this.repoRepo.findById(repoId);
+    if (!repo || repo.project_id !== projectId)
+      throw new NotFoundError("Repo not found");
+    return repo;
+  }
+
+  async listEnvFiles(projectId, repoId, userId) {
+    await this.getRepoInProject(projectId, repoId, userId);
+    return this.repoEnvFileRepo.findAllByRepo(repoId);
+  }
+
+  async createEnvFile(projectId, repoId, userId, branch, filename, content) {
+    await this.getRepoInProject(projectId, repoId, userId);
+    return this.repoEnvFileRepo.create(repoId, branch, filename, content);
+  }
+
+  async updateEnvFile(projectId, repoId, envFileId, userId, filename, content) {
+    await this.getRepoInProject(projectId, repoId, userId);
+    const envFile = this.repoEnvFileRepo.findById(envFileId);
+    if (!envFile || envFile.repo_id !== repoId)
+      throw new NotFoundError("Env file not found");
+    return this.repoEnvFileRepo.update(envFileId, filename, content);
+  }
+
+  async deleteEnvFile(projectId, repoId, envFileId, userId) {
+    await this.getRepoInProject(projectId, repoId, userId);
+    const envFile = this.repoEnvFileRepo.findById(envFileId);
+    if (!envFile || envFile.repo_id !== repoId)
+      throw new NotFoundError("Env file not found");
+    return this.repoEnvFileRepo.delete(envFileId);
   }
 }
