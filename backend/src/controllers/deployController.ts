@@ -18,9 +18,15 @@ const paginationSchema = Joi.object({
 export function makeDeployController(deployService) {
   return {
     async enqueueDeploy(req, res) {
+      const { repoIds } = req.body ?? {};
+      const parsedRepoIds =
+        Array.isArray(repoIds) && repoIds.length > 0
+          ? repoIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+          : undefined;
       const result = await deployService.enqueueDeploy(
         Number(req.params.id),
         req.user.id,
+        parsedRepoIds,
       );
       res.status(202).json({ data: result });
     },

@@ -56,7 +56,7 @@ const lockService = new LockService();
 const CONCURRENCY = 1;
 
 deployQueue.process(CONCURRENCY, async (job) => {
-  const { projectId, userId, jobId } = job.data;
+  const { projectId, userId, jobId, repoIds } = job.data;
 
   logger.info("Deploy job started", { jobId, projectId, userId });
 
@@ -86,7 +86,14 @@ deployQueue.process(CONCURRENCY, async (job) => {
     const user = await userRepo.findById(userId);
     if (!user) throw new Error(`User ${userId} not found`);
 
-    const repos = await repoRepo.findAllByProject(projectId);
+    let repos = await repoRepo.findAllByProject(projectId);
+
+    // Filter to specific repos if provided (manual selection)
+    if (Array.isArray(repoIds) && repoIds.length > 0) {
+      const selected = new Set(repoIds);
+      repos = repos.filter((r) => selected.has(r.id));
+    }
+
     if (repos.length === 0) {
       log("No repos configured — nothing to deploy");
       await deployLogRepo.updateStatus(jobId, {

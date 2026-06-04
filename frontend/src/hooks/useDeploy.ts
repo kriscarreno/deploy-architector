@@ -78,19 +78,22 @@ function useDeploy(projectId) {
   }, [jobId, toastSuccess, toastError]);
 
   /** Lanza el despliegue. El SSE se abre automáticamente al recibir el jobId. */
-  const deploy = useCallback(async () => {
-    if (isDeploying) return;
-    setStatus(JOB_STATUS.PENDING);
-    setStreamLines([]);
-    try {
-      const { jobId: id } = await deployService.trigger(projectId);
-      setJobId(id);
-      setStatus(JOB_STATUS.RUNNING);
-    } catch (err) {
-      setStatus(JOB_STATUS.FAILED);
-      toastError(getErrorMessage(err));
-    }
-  }, [projectId, isDeploying, toastError]);
+  const deploy = useCallback(
+    async (repoIds?: number[]) => {
+      if (isDeploying) return;
+      setStatus(JOB_STATUS.PENDING);
+      setStreamLines([]);
+      try {
+        const { jobId: id } = await deployService.trigger(projectId, repoIds);
+        setJobId(id);
+        setStatus(JOB_STATUS.RUNNING);
+      } catch (err) {
+        setStatus(JOB_STATUS.FAILED);
+        toastError(getErrorMessage(err));
+      }
+    },
+    [projectId, isDeploying, toastError],
+  );
 
   /** Cierra la conexión SSE y resetea el estado. */
   const reset = useCallback(() => {

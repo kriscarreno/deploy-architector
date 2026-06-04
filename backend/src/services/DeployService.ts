@@ -27,12 +27,18 @@ export class DeployService {
     projectId: number;
     userId: number;
     jobId: string;
+    repoIds?: number[];
   }>;
 
   constructor(
     projectRepo: ProjectRepository,
     deployLogRepo: DeployLogRepository,
-    deployQueue: Queue<{ projectId: number; userId: number; jobId: string }>,
+    deployQueue: Queue<{
+      projectId: number;
+      userId: number;
+      jobId: string;
+      repoIds?: number[];
+    }>,
     repoRepo: RepoRepository,
     userRepo: UserRepository,
   ) {
@@ -47,13 +53,25 @@ export class DeployService {
    * Enqueues a deploy job and creates the log entry.
    * @returns {{ jobId: string, logEntry: object }}
    */
-  async enqueueDeploy(projectId, userId) {
+  async enqueueDeploy(projectId, userId, repoIds?: number[]) {
     // RBAC check
     const project = await this.projectRepo.findById(projectId);
     if (!project) throw new NotFoundError("Project not found");
 
     const member = await this.projectRepo.isMember(projectId, userId);
     if (!member) throw new ForbiddenError();
+
+    // Validate that requested repoIds belong to this project
+    if (repoIds && repoIds.length > 0) {
+      const allRepos = await this.repoRepo.findAllByProject(projectId);
+      const validIds = new Set(allRepos.map((r) => r.id));
+      const invalid = repoIds.filter((rid) => !validIds.has(rid));
+      if (invalid.length > 0) {
+        throw new NotFoundError(
+          `Repos not found in project: ${invalid.join(", ")}`,
+        );
+      }
+    }
 
     const jobId = uuidv4();
 
@@ -66,7 +84,12 @@ export class DeployService {
 
     // Add to Bull queue — worker will update the log as it progresses
     await this.deployQueue.add(
-      { projectId, userId, jobId },
+      {
+        projectId,
+        userId,
+        jobId,
+        repoIds: repoIds?.length ? repoIds : undefined,
+      },
       {
         jobId, // Use our jobId as the Bull job id for easy lookup
         attempts: 1, // No automatic retries — deploy is not idempotent
@@ -75,7 +98,7 @@ export class DeployService {
       },
     );
 
-    logger.info("Deploy enqueued", { projectId, userId, jobId });
+    logger.info("Deploy enqueued", { projectId, userId, jobId, repoIds });
     return { jobId, logEntry };
   }
 

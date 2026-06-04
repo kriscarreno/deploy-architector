@@ -639,6 +639,101 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
   );
 }
 
+// Modal: seleccionar repos a incluir en el despliegue manual
+function SelectReposModal({
+  isOpen,
+  onClose,
+  repos,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  repos: { id: number; name: string; github_url: string }[];
+  onConfirm: (selectedIds: number[]) => void;
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  // Select all by default when modal opens
+  useEffect(() => {
+    if (isOpen) setSelected(new Set(repos.map((r) => r.id)));
+  }, [isOpen, repos]);
+
+  const toggle = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected(
+      selected.size === repos.length
+        ? new Set()
+        : new Set(repos.map((r) => r.id)),
+    );
+  };
+
+  const handleConfirm = () => {
+    onConfirm(Array.from(selected));
+    onClose();
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Seleccionar repos a desplegar"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirm} disabled={selected.size === 0}>
+            Desplegar ({selected.size})
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-slate-400">
+          Elige qué repositorios se incluirán en este despliegue.
+        </p>
+        <button
+          onClick={toggleAll}
+          className="self-start text-xs text-primary-400 hover:text-primary-300 transition-colors"
+        >
+          {selected.size === repos.length
+            ? "Deseleccionar todos"
+            : "Seleccionar todos"}
+        </button>
+        <ul className="flex flex-col gap-2">
+          {repos.map((repo) => (
+            <li key={repo.id}>
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dark-border bg-dark-bg px-4 py-3 hover:border-primary-500 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={selected.has(repo.id)}
+                  onChange={() => toggle(repo.id)}
+                  className="h-4 w-4 rounded border-dark-border accent-primary-500"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-200">
+                    {repo.name}
+                  </p>
+                  <p className="truncate font-mono text-xs text-slate-500">
+                    {repo.github_url}
+                  </p>
+                </div>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Modal>
+  );
+}
+
 // Modal: deploy manual de rama (workflow_dispatch)
 function DispatchModal({
   isOpen,
@@ -1510,6 +1605,7 @@ function ProjectDetailPage() {
   const [addRepoOpen, setAddRepoOpen] = useState(false);
   const [editRepo, setEditRepo] = useState(null);
   const [dispatchOpen, setDispatchOpen] = useState(false);
+  const [selectReposOpen, setSelectReposOpen] = useState(false);
   const [envVarsRepo, setEnvVarsRepo] = useState<{
     id: number;
     name: string;
@@ -1770,7 +1866,7 @@ function ProjectDetailPage() {
             Deploy rama
           </Button>
           <Button
-            onClick={deploy}
+            onClick={() => setSelectReposOpen(true)}
             loading={isDeploying}
             disabled={isDeploying || (project.repos?.length ?? 0) === 0}
             aria-label="Desplegar proyecto ahora"
@@ -1871,6 +1967,12 @@ function ProjectDetailPage() {
         onClose={() => setEditRepo(null)}
         onSubmit={handleEditRepo}
         repo={editRepo}
+      />
+      <SelectReposModal
+        isOpen={selectReposOpen}
+        onClose={() => setSelectReposOpen(false)}
+        repos={project.repos ?? []}
+        onConfirm={(selectedIds) => deploy(selectedIds)}
       />
       <DispatchModal
         isOpen={dispatchOpen}

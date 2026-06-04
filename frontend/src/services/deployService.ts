@@ -10,9 +10,12 @@ const deployService = {
    * @param {string} projectId
    * @returns {Promise<{ jobId: string }>}
    */
-  trigger(projectId) {
+  trigger(projectId, repoIds?: number[]) {
     return apiClient
-      .post(`/api/projects/${projectId}/deploy`)
+      .post(
+        `/api/projects/${projectId}/deploy`,
+        repoIds?.length ? { repoIds } : {},
+      )
       .then((r) => r.data.data);
   },
 
