@@ -49,6 +49,17 @@ const updateRepoSchema = Joi.object({
   workflow_file: Joi.string().trim().max(200),
 });
 
+const createEnvFileSchema = Joi.object({
+  branch: Joi.string().trim().min(1).max(255).required(),
+  filename: Joi.string().trim().min(1).max(255).required(),
+  content: Joi.string().allow("").default(""),
+});
+
+const updateEnvFileSchema = Joi.object({
+  filename: Joi.string().trim().min(1).max(255).required(),
+  content: Joi.string().allow("").default(""),
+});
+
 function validate(schema, data) {
   const { error, value } = schema.validate(data, {
     abortEarly: false,
@@ -173,6 +184,51 @@ export function makeProjectController(projectService) {
         },
       );
       res.json({ data: repo });
+    },
+
+    async listEnvFiles(req, res) {
+      const envFiles = await projectService.listEnvFiles(
+        Number(req.params.id),
+        Number(req.params.repoId),
+        req.user.id,
+      );
+      res.json({ data: envFiles });
+    },
+
+    async createEnvFile(req, res) {
+      const data = validate(createEnvFileSchema, req.body);
+      const envFile = await projectService.createEnvFile(
+        Number(req.params.id),
+        Number(req.params.repoId),
+        req.user.id,
+        data.branch,
+        data.filename,
+        data.content,
+      );
+      res.status(201).json({ data: envFile });
+    },
+
+    async updateEnvFile(req, res) {
+      const data = validate(updateEnvFileSchema, req.body);
+      const envFile = await projectService.updateEnvFile(
+        Number(req.params.id),
+        Number(req.params.repoId),
+        Number(req.params.envFileId),
+        req.user.id,
+        data.filename,
+        data.content,
+      );
+      res.json({ data: envFile });
+    },
+
+    async deleteEnvFile(req, res) {
+      await projectService.deleteEnvFile(
+        Number(req.params.id),
+        Number(req.params.repoId),
+        Number(req.params.envFileId),
+        req.user.id,
+      );
+      res.status(204).end();
     },
 
     async getProjectStatus(req, res) {

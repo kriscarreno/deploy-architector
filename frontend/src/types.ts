@@ -44,6 +44,16 @@ export interface Project {
   repo_count?: number;
 }
 
+export interface RepoEnvFile {
+  id: number;
+  repo_id: number;
+  branch: string;
+  filename: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DeployJob {
   id: number;
   project_id: number;

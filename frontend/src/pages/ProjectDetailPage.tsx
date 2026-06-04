@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import cronstrue from "cronstrue";
@@ -19,6 +19,8 @@ import projectService from "../services/projectService";
 import deployService from "../services/deployService";
 import envVarService from "../services/envVarService";
 import type { EnvVar, EnvBranch } from "../types";
+import projectService from "../services/projectService";
+import type { RepoEnvFile } from "../types";
 
 // Shared repo form fields
 function RepoFormFields({ register, errors, control }) {
@@ -112,6 +114,260 @@ function RepoFormFields({ register, errors, control }) {
         })}
       />
     </>
+  );
+}
+
+// Modal: gestionar archivos de entorno por rama (appsettings, .env, etc.)
+function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
+  const { toastSuccess, toastError } = useToast();
+  const [allFiles, setAllFiles] = useState<RepoEnvFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingFile, setEditingFile] = useState<RepoEnvFile | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [activeBranch, setActiveBranch] = useState<string>("");
+
+  const branches: string[] = repo
+    ? Array.from(new Set([repo.main_branch, repo.prod_branch]))
+    : [];
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    defaultValues: { filename: "", content: "" },
+  });
+
+  const loadFiles = useCallback(async () => {
+    if (!repo) return;
+    setLoading(true);
+    try {
+      const files = await projectService.listEnvFiles(projectId, repo.id);
+      setAllFiles(files);
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, repo, toastError]);
+
+  useEffect(() => {
+    if (isOpen && repo) {
+      setActiveBranch(repo.prod_branch);
+      setIsFormOpen(false);
+      setEditingFile(null);
+      loadFiles();
+    }
+  }, [isOpen, repo, loadFiles]);
+
+  const filesForBranch = allFiles.filter((f) => f.branch === activeBranch);
+
+  const openNew = () => {
+    setEditingFile(null);
+    reset({ filename: "", content: "" });
+    setIsFormOpen(true);
+  };
+
+  const openEdit = (file: RepoEnvFile) => {
+    setEditingFile(file);
+    reset({ filename: file.filename, content: file.content });
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (file: RepoEnvFile) => {
+    try {
+      await projectService.deleteEnvFile(projectId, repo.id, file.id);
+      toastSuccess(`"${file.filename}" eliminado`);
+      loadFiles();
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    }
+  };
+
+  const onSubmitForm = async (data) => {
+    try {
+      if (editingFile) {
+        await projectService.updateEnvFile(
+          projectId,
+          repo.id,
+          editingFile.id,
+          data,
+        );
+        toastSuccess(`"${data.filename}" actualizado`);
+      } else {
+        await projectService.createEnvFile(projectId, repo.id, {
+          branch: activeBranch,
+          filename: data.filename,
+          content: data.content,
+        });
+        toastSuccess(`"${data.filename}" creado en rama "${activeBranch}"`);
+      }
+      setIsFormOpen(false);
+      loadFiles();
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    }
+  };
+
+  const handleClose = () => {
+    setIsFormOpen(false);
+    setEditingFile(null);
+    onClose();
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={`Archivos de entorno — ${repo?.name ?? ""}`}
+      footer={
+        <Button variant="secondary" onClick={handleClose}>
+          Cerrar
+        </Button>
+      }
+    >
+      {/* Branch tabs */}
+      {!isFormOpen && (
+        <div className="mb-4 flex gap-1 rounded-lg border border-dark-border bg-dark-bg p-1">
+          {branches.map((branch) => {
+            const count = allFiles.filter((f) => f.branch === branch).length;
+            return (
+              <button
+                key={branch}
+                onClick={() => setActiveBranch(branch)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeBranch === branch
+                    ? "bg-primary-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M6 2a2 2 0 0 0-2 2v1a2 2 0 0 0 1 1.732V14.27A2 2 0 0 0 6 18a2 2 0 0 0 1-3.73V9.62a6 6 0 0 1 4 0v4.65A2 2 0 0 0 12 18a2 2 0 0 0 1-3.73V14a6 6 0 0 0-5.5-5.97V5.732A2 2 0 0 0 8 4V2H6zm6 0a2 2 0 0 0-2 2v.17A8 8 0 0 1 18 12v2.27A2 2 0 0 0 18 18a2 2 0 0 0 1-3.73V12a10 10 0 0 0-7-9.54V2h-1z" />
+                </svg>
+                {branch}
+                {count > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-xs ${activeBranch === branch ? "bg-primary-700" : "bg-dark-border"}`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {isFormOpen ? (
+        <form
+          onSubmit={handleSubmit(onSubmitForm)}
+          className="flex flex-col gap-4"
+        >
+          <p className="text-xs text-slate-500">
+            Rama:{" "}
+            <span className="font-mono text-slate-300">{activeBranch}</span>
+          </p>
+          <Input
+            id="env-filename"
+            label="Ruta del archivo (relativa al repo)"
+            required
+            placeholder="appsettings.Production.json"
+            hint='Ej: "appsettings.json", "src/.env", "config/prod.yaml"'
+            error={errors.filename?.message}
+            {...register("filename", { required: "El nombre es obligatorio" })}
+          />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-300">
+              Contenido
+            </label>
+            <textarea
+              rows={12}
+              placeholder={'{\n  "ConnectionStrings": { ... }\n}'}
+              className="w-full rounded-lg border border-dark-border bg-dark-bg px-3 py-2 font-mono text-xs text-slate-200 placeholder-slate-600 focus:border-primary-500 focus:outline-none resize-y"
+              {...register("content")}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setIsFormOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isSubmitting}>
+              {editingFile ? "Guardar cambios" : "Crear archivo"}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-end">
+            <Button onClick={openNew}>+ Nuevo archivo</Button>
+          </div>
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Spinner />
+            </div>
+          ) : filesForBranch.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-500">
+              Sin archivos para la rama{" "}
+              <span className="font-mono">{activeBranch}</span>. Añade uno para
+              que se escriba en el repo durante el despliegue.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {filesForBranch.map((file) => (
+                <li
+                  key={file.id}
+                  className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-bg px-4 py-3"
+                >
+                  <span className="font-mono text-sm text-slate-200">
+                    {file.filename}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => openEdit(file)}
+                      aria-label={`Editar ${file.filename}`}
+                      className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(file)}
+                      aria-label={`Eliminar ${file.filename}`}
+                      className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -1131,6 +1387,7 @@ function ProjectDetailPage() {
     id: number;
     name: string;
   } | null>(null);
+  const [envFilesRepo, setEnvFilesRepo] = useState(null);
   const { toastSuccess, toastError } = useToast();
   const { startTour } = useProjectTour();
   const {
@@ -1268,6 +1525,21 @@ function ProjectDetailPage() {
               fill="currentColor"
             >
               <path d="M20 3H4v2h16V3zm1 7H3v2h18v-2zm-1 7H4v2h16v-2z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setEnvFilesRepo(row)}
+            aria-label={`Archivos de entorno de ${row.name}`}
+            title="Archivos de entorno"
+            className="rounded p-1 text-slate-500 hover:text-emerald-400 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 17h8v-1H8v1zm0-3h8v-1H8v1zm0-3h5v-1H8v1z" />
             </svg>
           </button>
           <button
@@ -1484,6 +1756,12 @@ function ProjectDetailPage() {
         onClose={() => setEnvVarsRepo(null)}
         projectId={id!}
         repo={envVarsRepo}
+      />
+      <EnvFilesModal
+        isOpen={Boolean(envFilesRepo)}
+        onClose={() => setEnvFilesRepo(null)}
+        projectId={id}
+        repo={envFilesRepo}
       />
     </section>
   );

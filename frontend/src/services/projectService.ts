@@ -135,6 +135,39 @@ const projectService = {
         }>,
     );
   },
+
+  // ── Env files ─────────────────────────────────────────────────────────────
+
+  listEnvFiles(projectId, repoId) {
+    return apiClient
+      .get(`/api/projects/${projectId}/repos/${repoId}/env-files`)
+      .then((r) => r.data.data);
+  },
+
+  createEnvFile(
+    projectId,
+    repoId,
+    payload: { branch: string; filename: string; content: string },
+  ) {
+    return apiClient
+      .post(`/api/projects/${projectId}/repos/${repoId}/env-files`, payload)
+      .then((r) => r.data.data);
+  },
+
+  updateEnvFile(projectId, repoId, envFileId, payload) {
+    return apiClient
+      .put(
+        `/api/projects/${projectId}/repos/${repoId}/env-files/${envFileId}`,
+        payload,
+      )
+      .then((r) => r.data.data);
+  },
+
+  deleteEnvFile(projectId, repoId, envFileId) {
+    return apiClient.delete(
+      `/api/projects/${projectId}/repos/${repoId}/env-files/${envFileId}`,
+    );
+  },
 };
 
 export default projectService;

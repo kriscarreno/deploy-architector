@@ -84,6 +84,17 @@ const migrations = [
     updated_at TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE(repo_id, branch, key)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS repo_env_files (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id    INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+    branch     TEXT    NOT NULL DEFAULT '',
+    filename   TEXT    NOT NULL,
+    content    TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(repo_id, branch, filename)
+  )`,
 ];
 
 // Run all migrations in a single transaction
@@ -116,3 +127,12 @@ for (const sql of alterMigrations) {
 }
 
 logger.info("Migrations applied successfully");
+
+// ── Safe additive schema updates (idempotent — ignore if column already exists) ─
+try {
+  db.exec(
+    `ALTER TABLE repo_env_files ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
+  );
+} catch (_) {
+  // Column already exists on databases created before this migration
+}
