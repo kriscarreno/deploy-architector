@@ -189,4 +189,12 @@ export class ProjectService {
       throw new NotFoundError("Env file not found");
     return this.repoEnvFileRepo.delete(envFileId);
   }
+
+  async getEnvFile(projectId, repoId, envFileId, userId) {
+    await this.getRepoInProject(projectId, repoId, userId);
+    const envFile = this.repoEnvFileRepo.findById(envFileId);
+    if (!envFile || envFile.repo_id !== repoId)
+      throw new NotFoundError("Env file not found");
+    return envFile;
+  }
 }

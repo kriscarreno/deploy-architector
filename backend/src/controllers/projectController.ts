@@ -36,7 +36,8 @@ const addRepoSchema = Joi.object({
   order: Joi.number().integer().min(0).default(0),
   main_url: Joi.string().uri().allow("", null).default(null),
   prod_url: Joi.string().uri().allow("", null).default(null),
-  workflow_file: Joi.string().trim().max(200).default("deploy.yml"),
+  main_workflow_file: Joi.string().trim().max(200).default("deploy.yml"),
+  prod_workflow_file: Joi.string().trim().max(200).default("deploy.yml"),
 });
 
 const updateRepoSchema = Joi.object({
@@ -46,7 +47,8 @@ const updateRepoSchema = Joi.object({
   order: Joi.number().integer().min(0),
   main_url: Joi.string().uri().allow("", null),
   prod_url: Joi.string().uri().allow("", null),
-  workflow_file: Joi.string().trim().max(200),
+  main_workflow_file: Joi.string().trim().max(200),
+  prod_workflow_file: Joi.string().trim().max(200),
 });
 
 const createEnvFileSchema = Joi.object({
@@ -122,7 +124,8 @@ export function makeProjectController(projectService) {
           orderIndex: data.order,
           mainUrl: data.main_url ?? null,
           prodUrl: data.prod_url ?? null,
-          workflowFile: data.workflow_file,
+          mainWorkflowFile: data.main_workflow_file,
+          prodWorkflowFile: data.prod_workflow_file,
         },
       );
       res.status(201).json({ data: repo });
@@ -180,7 +183,8 @@ export function makeProjectController(projectService) {
           orderIndex: data.order,
           mainUrl: "main_url" in data ? (data.main_url ?? null) : undefined,
           prodUrl: "prod_url" in data ? (data.prod_url ?? null) : undefined,
-          workflowFile: data.workflow_file,
+          mainWorkflowFile: data.main_workflow_file,
+          prodWorkflowFile: data.prod_workflow_file,
         },
       );
       res.json({ data: repo });
@@ -229,6 +233,23 @@ export function makeProjectController(projectService) {
         req.user.id,
       );
       res.status(204).end();
+    },
+
+    async downloadEnvFile(req, res) {
+      const envFile = await projectService.getEnvFile(
+        Number(req.params.id),
+        Number(req.params.repoId),
+        Number(req.params.envFileId),
+        req.user.id,
+      );
+      // Use just the basename of the stored filename for the download header
+      const basename = envFile.filename.split("/").pop() ?? envFile.filename;
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${basename}"`,
+      );
+      res.send(envFile.content);
     },
 
     async getProjectStatus(req, res) {

@@ -168,6 +168,15 @@ const projectService = {
       `/api/projects/${projectId}/repos/${repoId}/env-files/${envFileId}`,
     );
   },
+
+  /** Returns the URL to directly download an env file with its original filename. */
+  envFileDownloadUrl(
+    projectId: number | string,
+    repoId: number | string,
+    envFileId: number,
+  ): string {
+    return `/api/projects/${projectId}/repos/${repoId}/env-files/${envFileId}/download`;
+  },
 };
 
 export default projectService;

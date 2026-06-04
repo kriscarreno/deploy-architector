@@ -145,7 +145,10 @@ export class DeployService {
         const owner = parts[0];
         const repoName = parts[1]?.replace(/\.git$/, "");
 
-        const workflowFile = repo.workflow_file || "deploy.yml";
+        const workflowFile =
+          branch === repo.main_branch
+            ? repo.main_workflow_file || "deploy.yml"
+            : repo.prod_workflow_file || "deploy.yml";
 
         try {
           const resp = await fetch(

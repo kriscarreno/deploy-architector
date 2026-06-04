@@ -101,12 +101,25 @@ function RepoFormFields({ register, errors, control }) {
         />
       </div>
       <Input
-        id="workflow-file"
-        label="Archivo de workflow"
+        id="main-workflow-file"
+        label="Workflow rama main"
         placeholder="deploy.yml"
-        hint="Nombre del archivo en .github/workflows/ para deploy manual"
-        error={errors.workflow_file?.message}
-        {...register("workflow_file", {
+        hint="Archivo en .github/workflows/ para deploy manual de main"
+        error={errors.main_workflow_file?.message}
+        {...register("main_workflow_file", {
+          pattern: {
+            value: /^[\w.-]+\.ya?ml$/,
+            message: "Debe ser un archivo .yml o .yaml",
+          },
+        })}
+      />
+      <Input
+        id="prod-workflow-file"
+        label="Workflow rama producción"
+        placeholder="deploy.yml"
+        hint="Archivo en .github/workflows/ para deploy manual de producción"
+        error={errors.prod_workflow_file?.message}
+        {...register("prod_workflow_file", {
           pattern: {
             value: /^[\w.-]+\.ya?ml$/,
             message: "Debe ser un archivo .yml o .yaml",
@@ -123,8 +136,10 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
   const [allFiles, setAllFiles] = useState<RepoEnvFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingFile, setEditingFile] = useState<RepoEnvFile | null>(null);
+  const [viewingFile, setViewingFile] = useState<RepoEnvFile | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeBranch, setActiveBranch] = useState<string>("");
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const branches: string[] = repo
     ? Array.from(new Set([repo.main_branch, repo.prod_branch]))
@@ -157,6 +172,7 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
       setActiveBranch(repo.prod_branch);
       setIsFormOpen(false);
       setEditingFile(null);
+      setViewingFile(null);
       loadFiles();
     }
   }, [isOpen, repo, loadFiles]);
@@ -183,6 +199,31 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
     } catch (err) {
       toastError(getErrorMessage(err));
     }
+  };
+
+  /** Descarga el archivo con su nombre original. */
+  const handleDownload = (file: RepoEnvFile) => {
+    const url = projectService.envFileDownloadUrl(projectId, repo.id, file.id);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.filename.split("/").pop() ?? file.filename;
+    a.click();
+  };
+
+  /** Importa un archivo local: lee su contenido y abre el formulario pre-cargado. */
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      setEditingFile(null);
+      reset({ filename: file.name, content });
+      setIsFormOpen(true);
+    };
+    reader.readAsText(file);
+    // reset so same file can be re-imported
+    e.target.value = "";
   };
 
   const onSubmitForm = async (data) => {
@@ -213,6 +254,7 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
   const handleClose = () => {
     setIsFormOpen(false);
     setEditingFile(null);
+    setViewingFile(null);
     onClose();
   };
 
@@ -227,6 +269,13 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
         </Button>
       }
     >
+      {/* Hidden file input for importing local files */}
+      <input
+        ref={importInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleImportFile}
+      />
       {/* Branch tabs */}
       {!isFormOpen && (
         <div className="mb-4 flex gap-1 rounded-lg border border-dark-border bg-dark-bg p-1">
@@ -308,7 +357,14 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
         </form>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => importInputRef.current?.click()}
+              title="Importar archivo desde disco"
+            >
+              Importar archivo
+            </Button>
             <Button onClick={openNew}>+ Nuevo archivo</Button>
           </div>
           {loading ? (
@@ -326,41 +382,104 @@ function EnvFilesModal({ isOpen, onClose, projectId, repo }) {
               {filesForBranch.map((file) => (
                 <li
                   key={file.id}
-                  className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-bg px-4 py-3"
+                  className="flex flex-col rounded-lg border border-dark-border bg-dark-bg"
                 >
-                  <span className="font-mono text-sm text-slate-200">
-                    {file.filename}
-                  </span>
-                  <div className="flex gap-1">
+                  <div className="flex items-center justify-between px-4 py-3">
                     <button
-                      onClick={() => openEdit(file)}
-                      aria-label={`Editar ${file.filename}`}
-                      className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
+                      type="button"
+                      onClick={() =>
+                        setViewingFile(
+                          viewingFile?.id === file.id ? null : file,
+                        )
+                      }
+                      className="flex-1 text-left font-mono text-sm text-slate-200 hover:text-primary-300 transition-colors truncate"
+                      title="Ver contenido"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                      </svg>
+                      {file.filename}
                     </button>
-                    <button
-                      onClick={() => handleDelete(file)}
-                      aria-label={`Eliminar ${file.filename}`}
-                      className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
+                    <div className="flex gap-1 flex-shrink-0 ml-2">
+                      {/* View toggle */}
+                      <button
+                        onClick={() =>
+                          setViewingFile(
+                            viewingFile?.id === file.id ? null : file,
+                          )
+                        }
+                        aria-label={`Ver contenido de ${file.filename}`}
+                        title="Ver contenido"
+                        className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
                       >
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                      </svg>
-                    </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                      </button>
+                      {/* Download */}
+                      <button
+                        onClick={() => handleDownload(file)}
+                        aria-label={`Descargar ${file.filename}`}
+                        title="Descargar"
+                        className="rounded p-1 text-slate-500 hover:text-green-400 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                        </svg>
+                      </button>
+                      {/* Edit */}
+                      <button
+                        onClick={() => openEdit(file)}
+                        aria-label={`Editar ${file.filename}`}
+                        title="Editar"
+                        className="rounded p-1 text-slate-500 hover:text-primary-400 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                        </svg>
+                      </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDelete(file)}
+                        aria-label={`Eliminar ${file.filename}`}
+                        title="Eliminar"
+                        className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
+                  {/* Inline content viewer */}
+                  {viewingFile?.id === file.id && (
+                    <div className="border-t border-dark-border px-4 pb-4 pt-3">
+                      <pre className="max-h-72 overflow-auto rounded-lg bg-black/40 p-3 font-mono text-xs text-slate-200 whitespace-pre-wrap break-all">
+                        {file.content || (
+                          <span className="text-slate-500">
+                            (sin contenido)
+                          </span>
+                        )}
+                      </pre>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -397,7 +516,8 @@ function AddRepoModal({
       order: nextOrder,
       main_url: "",
       prod_url: "",
-      workflow_file: "deploy.yml",
+      main_workflow_file: "deploy.yml",
+      prod_workflow_file: "deploy.yml",
     },
   });
 
@@ -411,7 +531,8 @@ function AddRepoModal({
         order: nextOrder,
         main_url: "",
         prod_url: "",
-        workflow_file: "deploy.yml",
+        main_workflow_file: "deploy.yml",
+        prod_workflow_file: "deploy.yml",
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, nextOrder]);
@@ -479,7 +600,8 @@ function EditRepoModal({ isOpen, onClose, onSubmit, repo }) {
         order: repo.order_index,
         main_url: repo.main_url ?? "",
         prod_url: repo.prod_url ?? "",
-        workflow_file: repo.workflow_file ?? "deploy.yml",
+        main_workflow_file: repo.main_workflow_file ?? "deploy.yml",
+        prod_workflow_file: repo.prod_workflow_file ?? "deploy.yml",
       });
     }
   }, [repo, reset]);
@@ -531,7 +653,8 @@ function DispatchModal({
     github_url: string;
     main_branch: string;
     prod_branch: string;
-    workflow_file: string;
+    main_workflow_file: string;
+    prod_workflow_file: string;
   }[];
   projectId: string;
 }) {
@@ -648,7 +771,11 @@ function DispatchModal({
                     </span>
                     <span className="text-slate-600">→</span>
                     <span className="font-mono text-primary-300">
-                      .github/workflows/{r.workflow_file || "deploy.yml"}
+                      main: .github/workflows/
+                      {r.main_workflow_file || "deploy.yml"}
+                      {" / "}
+                      prod: .github/workflows/
+                      {r.prod_workflow_file || "deploy.yml"}
                     </span>
                   </div>
                 ))}

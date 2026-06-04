@@ -15,7 +15,8 @@ type CreatePayload = {
   mainBranch?: string;
   mainUrl?: string | null;
   prodUrl?: string | null;
-  workflowFile?: string;
+  mainWorkflowFile?: string;
+  prodWorkflowFile?: string;
 };
 
 type UpdatePayload = {
@@ -26,7 +27,8 @@ type UpdatePayload = {
   orderIndex?: number;
   mainUrl?: string | null;
   prodUrl?: string | null;
-  workflowFile?: string;
+  mainWorkflowFile?: string;
+  prodWorkflowFile?: string;
 };
 
 export class RepoRepository {
@@ -55,12 +57,13 @@ export class RepoRepository {
     mainBranch = "main",
     mainUrl = null,
     prodUrl = null,
-    workflowFile = "deploy.yml",
+    mainWorkflowFile = "deploy.yml",
+    prodWorkflowFile = "deploy.yml",
   }: CreatePayload): Promise<Repo | null> {
     const result = db
       .prepare(
-        `INSERT INTO repos (project_id, github_url, name, order_index, prod_branch, main_branch, main_url, prod_url, workflow_file)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO repos (project_id, github_url, name, order_index, prod_branch, main_branch, main_url, prod_url, main_workflow_file, prod_workflow_file)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         projectId,
@@ -71,7 +74,8 @@ export class RepoRepository {
         mainBranch,
         mainUrl,
         prodUrl,
-        workflowFile,
+        mainWorkflowFile,
+        prodWorkflowFile,
       );
 
     return this.findById(Number(result.lastInsertRowid));
@@ -87,19 +91,21 @@ export class RepoRepository {
       orderIndex,
       mainUrl,
       prodUrl,
-      workflowFile,
+      mainWorkflowFile,
+      prodWorkflowFile,
     }: UpdatePayload,
   ): Promise<Repo | null> {
     db.prepare(
       `UPDATE repos
-          SET github_url    = COALESCE(?, github_url),
-              name          = COALESCE(?, name),
-              main_branch   = COALESCE(?, main_branch),
-              prod_branch   = COALESCE(?, prod_branch),
-              order_index   = COALESCE(?, order_index),
-              main_url      = IIF(? IS NOT NULL, ?, main_url),
-              prod_url      = IIF(? IS NOT NULL, ?, prod_url),
-              workflow_file = COALESCE(?, workflow_file)
+          SET github_url         = COALESCE(?, github_url),
+              name               = COALESCE(?, name),
+              main_branch        = COALESCE(?, main_branch),
+              prod_branch        = COALESCE(?, prod_branch),
+              order_index        = COALESCE(?, order_index),
+              main_url           = IIF(? IS NOT NULL, ?, main_url),
+              prod_url           = IIF(? IS NOT NULL, ?, prod_url),
+              main_workflow_file = COALESCE(?, main_workflow_file),
+              prod_workflow_file = COALESCE(?, prod_workflow_file)
         WHERE id = ?`,
     ).run(
       githubUrl ?? null,
@@ -112,7 +118,8 @@ export class RepoRepository {
       mainUrl !== undefined ? mainUrl : null,
       prodUrl !== undefined ? 1 : null,
       prodUrl !== undefined ? prodUrl : null,
-      workflowFile ?? null,
+      mainWorkflowFile ?? null,
+      prodWorkflowFile ?? null,
       repoId,
     );
     return this.findById(repoId);

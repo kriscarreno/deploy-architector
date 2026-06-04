@@ -54,6 +54,10 @@ export function makeProjectRouter(projectCtrl, deployCtrl) {
     "/:id/repos/:repoId/env-files/:envFileId",
     asyncHandler(projectCtrl.deleteEnvFile),
   );
+  router.get(
+    "/:id/repos/:repoId/env-files/:envFileId/download",
+    asyncHandler(projectCtrl.downloadEnvFile),
+  );
 
   router.get("/:id/diff", asyncHandler(projectCtrl.getProjectDiff));
   router.get("/:id/status", asyncHandler(projectCtrl.getProjectStatus));

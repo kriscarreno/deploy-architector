@@ -113,9 +113,11 @@ try {
 const alterMigrations = [
   `ALTER TABLE projects ADD COLUMN cron_expression TEXT`,
   `ALTER TABLE projects ADD COLUMN cron_enabled    INTEGER NOT NULL DEFAULT 0`,
-  `ALTER TABLE repos    ADD COLUMN main_url         TEXT`,
-  `ALTER TABLE repos    ADD COLUMN prod_url         TEXT`,
-  `ALTER TABLE repos    ADD COLUMN workflow_file    TEXT NOT NULL DEFAULT 'deploy.yml'`,
+  `ALTER TABLE repos    ADD COLUMN main_url              TEXT`,
+  `ALTER TABLE repos    ADD COLUMN prod_url              TEXT`,
+  `ALTER TABLE repos    ADD COLUMN workflow_file         TEXT NOT NULL DEFAULT 'deploy.yml'`,
+  `ALTER TABLE repos    ADD COLUMN main_workflow_file    TEXT NOT NULL DEFAULT 'deploy.yml'`,
+  `ALTER TABLE repos    ADD COLUMN prod_workflow_file    TEXT NOT NULL DEFAULT 'deploy.yml'`,
 ];
 
 for (const sql of alterMigrations) {
