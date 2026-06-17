@@ -16,8 +16,12 @@ import app, { deployService, projectRepo } from "./app.js";
 import { env } from "./config/env.js";
 import logger from "./config/logger.js";
 import { scheduler } from "./config/scheduler.js";
+import { HealthcheckScheduler } from "./services/HealthcheckScheduler.js";
 
 const server = http.createServer(app);
+
+// Background pings to diagram nodes' healthcheck URLs
+const healthcheckScheduler = new HealthcheckScheduler();
 
 server.listen(env.PORT, async () => {
   logger.info(`Server listening`, { port: env.PORT, env: env.NODE_ENV });
@@ -25,11 +29,14 @@ server.listen(env.PORT, async () => {
   // Start cron scheduler after DB migrations have run
   scheduler.init(deployService, projectRepo);
   await scheduler.loadAll();
+  healthcheckScheduler.start();
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────
 async function shutdown(signal) {
   logger.info(`${signal} received — shutting down gracefully`);
+
+  healthcheckScheduler.stop();
 
   server.close((err) => {
     if (err) {

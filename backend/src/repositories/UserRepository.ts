@@ -69,4 +69,12 @@ export class UserRepository {
         .get(githubId) as unknown as User | undefined) ?? null
     );
   }
+
+  async findByUsername(username: string): Promise<User | null> {
+    return (
+      (db
+        .prepare("SELECT * FROM users WHERE username = ?")
+        .get(username) as unknown as User | undefined) ?? null
+    );
+  }
 }
