@@ -15,16 +15,23 @@ import http from "http";
 import app from "./app.js";
 import { env } from "./config/env.js";
 import logger from "./config/logger.js";
+import { HealthcheckScheduler } from "./services/HealthcheckScheduler.js";
 
 const server = http.createServer(app);
 
+// Background pings to diagram nodes' healthcheck URLs
+const healthcheckScheduler = new HealthcheckScheduler();
+
 server.listen(env.PORT, () => {
   logger.info(`Server listening`, { port: env.PORT, env: env.NODE_ENV });
+  healthcheckScheduler.start();
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────
 async function shutdown(signal) {
   logger.info(`${signal} received — shutting down gracefully`);
+
+  healthcheckScheduler.stop();
 
   server.close((err) => {
     if (err) {

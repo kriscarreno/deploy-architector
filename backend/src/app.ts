@@ -27,10 +27,16 @@ import { ProjectRepository } from "./repositories/ProjectRepository.js";
 import { RepoRepository } from "./repositories/RepoRepository.js";
 import { RepoEnvFileRepository } from "./repositories/RepoEnvFileRepository.js";
 import { DeployLogRepository } from "./repositories/DeployLogRepository.js";
+import { TeamRepository } from "./repositories/TeamRepository.js";
+import { DiagramRepository } from "./repositories/DiagramRepository.js";
+import { DiagramNodeRepository } from "./repositories/DiagramNodeRepository.js";
+import { DiagramEdgeRepository } from "./repositories/DiagramEdgeRepository.js";
 
 // Services
 import { ProjectService } from "./services/ProjectService.js";
 import { DeployService } from "./services/DeployService.js";
+import { TeamService } from "./services/TeamService.js";
+import { DiagramService } from "./services/DiagramService.js";
 
 // Queue
 import { deployQueue } from "./queues/deployQueue.js";
@@ -38,11 +44,15 @@ import { deployQueue } from "./queues/deployQueue.js";
 // Controllers
 import { makeProjectController } from "./controllers/projectController.js";
 import { makeDeployController } from "./controllers/deployController.js";
+import { makeTeamController } from "./controllers/teamController.js";
+import { makeDiagramController } from "./controllers/diagramController.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
 import { makeProjectRouter } from "./routes/projectRoutes.js";
 import { makeJobRouter } from "./routes/jobRoutes.js";
+import { makeTeamRouter } from "./routes/teamRoutes.js";
+import { makeDiagramRouter } from "./routes/diagramRoutes.js";
 
 // Middlewares
 import { correlationId } from "./middlewares/correlationId.js";
@@ -55,6 +65,10 @@ const projectRepo = new ProjectRepository();
 const repoRepo = new RepoRepository();
 const repoEnvFileRepo = new RepoEnvFileRepository();
 const deployLogRepo = new DeployLogRepository();
+const teamRepo = new TeamRepository();
+const diagramRepo = new DiagramRepository();
+const diagramNodeRepo = new DiagramNodeRepository();
+const diagramEdgeRepo = new DiagramEdgeRepository();
 
 // ── Configure Passport (inject userRepo) ──────────────────────────────────
 configurePassport(userRepo);
@@ -70,10 +84,20 @@ const deployService = new DeployService(
   deployLogRepo,
   deployQueue,
 );
+const teamService = new TeamService(teamRepo, userRepo);
+const diagramService = new DiagramService(
+  diagramRepo,
+  diagramNodeRepo,
+  diagramEdgeRepo,
+  projectRepo,
+  teamRepo,
+);
 
 // ── Instantiate controllers ───────────────────────────────────────────────
 const projectCtrl = makeProjectController(projectService);
 const deployCtrl = makeDeployController(deployService);
+const teamCtrl = makeTeamController(teamService);
+const diagramCtrl = makeDiagramController(diagramService);
 
 // ── Build Express app ─────────────────────────────────────────────────────
 const app = express();
@@ -157,6 +181,8 @@ if (env.NODE_ENV !== "production") {
 app.use("/auth", authRoutes);
 app.use("/api/projects", makeProjectRouter(projectCtrl, deployCtrl));
 app.use("/api/jobs", makeJobRouter(deployCtrl));
+app.use("/api/teams", makeTeamRouter(teamCtrl));
+app.use("/api/diagrams", makeDiagramRouter(diagramCtrl));
 
 // ── Health check (no auth) ────────────────────────────────────────────────
 app.get("/health", (_req, res) =>

@@ -13,6 +13,11 @@ const AuthCallbackPage = lazy(() => import("../pages/AuthCallbackPage"));
 const DashboardPage = lazy(() => import("../pages/DashboardPage"));
 const ProjectDetailPage = lazy(() => import("../pages/ProjectDetailPage"));
 const HistoryPage = lazy(() => import("../pages/HistoryPage"));
+const ArchitectureListPage = lazy(() => import("../pages/ArchitectureListPage"));
+const ArchitectureGraphPage = lazy(
+  () => import("../pages/ArchitectureGraphPage"),
+);
+const TeamsPage = lazy(() => import("../pages/TeamsPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 
 /** Fallback de suspense global */
@@ -71,6 +76,30 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <HistoryPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/architecture",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <ArchitectureListPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/architecture/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <ArchitectureGraphPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/teams",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TeamsPage />
           </Suspense>
         ),
       },

@@ -36,4 +36,7 @@ export const env = cleanEnv(process.env, {
 
   REPOS_BASE_DIR: str({ default: "./data/repos" }),
   FRONTEND_URL: str({ default: "http://localhost:5173" }),
+
+  // Interval (ms) between background pings to diagram nodes' healthcheck URLs
+  HEALTHCHECK_INTERVAL_MS: num({ default: 30_000 }),
 });

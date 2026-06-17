@@ -83,6 +83,67 @@ const migrations = [
     updated_at TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE(repo_id, branch, filename)
   )`,
+
+  // ── Teams (collaboration) ────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS teams (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS team_members (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role       TEXT    NOT NULL DEFAULT 'member', -- 'owner' | 'admin' | 'member'
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(team_id, user_id)
+  )`,
+
+  // ── Architecture diagrams (3D graph) ─────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS diagrams (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id     INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+    name        TEXT    NOT NULL,
+    description TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS diagram_nodes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    diagram_id      INTEGER NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+    kind            TEXT    NOT NULL DEFAULT 'external', -- 'project' | 'external'
+    project_id      INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    label           TEXT    NOT NULL,
+    service_type    TEXT,
+    url             TEXT,
+    healthcheck_url TEXT,
+    icon            TEXT,
+    color           TEXT,
+    notes           TEXT,
+    pos_x           REAL    NOT NULL DEFAULT 0,
+    pos_y           REAL    NOT NULL DEFAULT 0,
+    pos_z           REAL    NOT NULL DEFAULT 0,
+    status          TEXT    NOT NULL DEFAULT 'unknown', -- 'unknown' | 'up' | 'down'
+    last_checked_at TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS diagram_edges (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    diagram_id     INTEGER NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+    source_node_id INTEGER NOT NULL REFERENCES diagram_nodes(id) ON DELETE CASCADE,
+    target_node_id INTEGER NOT NULL REFERENCES diagram_nodes(id) ON DELETE CASCADE,
+    label          TEXT,
+    edge_type      TEXT,
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(diagram_id, source_node_id, target_node_id)
+  )`,
 ];
 
 // Run all migrations in a single transaction
