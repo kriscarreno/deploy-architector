@@ -66,6 +66,77 @@ export interface RepoEnvFile {
   updated_at: string;
 }
 
+// ── Teams ────────────────────────────────────────────────────────────────
+
+export type TeamRole = "owner" | "admin" | "member";
+
+export interface TeamMember {
+  id: number;
+  username: string;
+  avatar_url: string | null;
+  role: TeamRole;
+}
+
+export interface Team {
+  id: number;
+  owner_id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  members?: TeamMember[];
+}
+
+// ── Architecture diagrams (3D graph) ────────────────────────────────────────
+
+export type NodeKind = "project" | "external";
+export type NodeStatus = "unknown" | "up" | "down";
+
+export interface Diagram {
+  id: number;
+  owner_id: number;
+  team_id: number | null;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiagramNode {
+  id: number;
+  diagram_id: number;
+  kind: NodeKind;
+  project_id: number | null;
+  label: string;
+  service_type: string | null;
+  url: string | null;
+  healthcheck_url: string | null;
+  icon: string | null;
+  color: string | null;
+  notes: string | null;
+  pos_x: number;
+  pos_y: number;
+  pos_z: number;
+  status: NodeStatus;
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiagramEdge {
+  id: number;
+  diagram_id: number;
+  source_node_id: number;
+  target_node_id: number;
+  label: string | null;
+  edge_type: string | null;
+  created_at: string;
+}
+
+export interface DiagramWithGraph extends Diagram {
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+}
+
 export interface DeployJob {
   id: number;
   project_id: number;

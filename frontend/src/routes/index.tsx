@@ -14,6 +14,13 @@ const DashboardPage = lazy(() => import("../pages/DashboardPage"));
 const ProjectsPage = lazy(() => import("../pages/ProjectsPage"));
 const ProjectDetailPage = lazy(() => import("../pages/ProjectDetailPage"));
 const HistoryPage = lazy(() => import("../pages/HistoryPage"));
+const ArchitectureListPage = lazy(
+  () => import("../pages/ArchitectureListPage"),
+);
+const ArchitectureGraphPage = lazy(
+  () => import("../pages/ArchitectureGraphPage"),
+);
+const TeamsPage = lazy(() => import("../pages/TeamsPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const TransparencyPage = lazy(() => import("../pages/TransparencyPage"));
 const StatusPage = lazy(() => import("../pages/StatusPage"));
@@ -107,6 +114,30 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <TransparencyPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/architecture",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <ArchitectureListPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/architecture/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <ArchitectureGraphPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/teams",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TeamsPage />
           </Suspense>
         ),
       },
