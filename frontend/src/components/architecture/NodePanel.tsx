@@ -88,7 +88,8 @@ function NodePanel({
   };
 
   return (
-    <aside className="flex h-full w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto border-l border-dark-border bg-dark-surface p-4">
+    <aside className="flex h-full w-80 flex-shrink-0 flex-col border-l border-dark-border bg-dark-surface">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           {(() => {
@@ -228,8 +229,10 @@ function NodePanel({
           </ul>
         )}
       </div>
+      </div>
 
-      <div className="mt-auto flex flex-col gap-2 border-t border-dark-border pt-4">
+      {/* Acciones siempre visibles (footer fijo) */}
+      <div className="flex flex-shrink-0 flex-col gap-2 border-t border-dark-border bg-dark-surface p-4">
         <Button variant="secondary" onClick={() => onStartConnect(node.id)}>
           Conectar desde aquí
         </Button>
