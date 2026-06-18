@@ -65,6 +65,19 @@ export class DiagramEdgeRepository {
     return row ?? this.findById(Number(result.lastInsertRowid));
   }
 
+  async update(
+    edgeId: number,
+    { label, edgeType }: { label?: string | null; edgeType?: string | null },
+  ): Promise<DiagramEdge | null> {
+    db.prepare(
+      `UPDATE diagram_edges
+          SET label = COALESCE(?, label),
+              edge_type = COALESCE(?, edge_type)
+        WHERE id = ?`,
+    ).run(label ?? null, edgeType ?? null, edgeId);
+    return this.findById(edgeId);
+  }
+
   async delete(edgeId: number): Promise<void> {
     db.prepare("DELETE FROM diagram_edges WHERE id = ?").run(edgeId);
   }

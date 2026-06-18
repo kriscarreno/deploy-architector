@@ -59,10 +59,131 @@ interface Graph3DProps {
   connecting?: boolean;
   onNodeClick?: (nodeId: number) => void;
   onBackgroundClick?: () => void;
+  onLinkClick?: (edgeId: number) => void;
   onNodeDragEnd?: (
     nodeId: number,
     pos: { posX: number; posY: number; posZ: number },
   ) => void;
+}
+
+/** ¿La conexión lleva flecha en ambos extremos? */
+function isBidirectional(edgeType?: string | null): boolean {
+  const t = (edgeType ?? "").toLowerCase();
+  return (
+    t === "bidirectional" || t === "both" || t === "<->" || t === "two-way"
+  );
+}
+
+// ── Decorado de escena: estrellas + rejilla de suelo para dar sensación 3D ──
+
+function makeStarfield(): THREE.Points {
+  const count = 1500;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 700 + Math.random() * 1600;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x93c5fd,
+    size: 2.4,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false,
+  });
+  return new THREE.Points(geo, mat);
+}
+
+function makeGrid(): THREE.GridHelper {
+  const grid = new THREE.GridHelper(2600, 52, 0x2563eb, 0x1e293b);
+  grid.position.y = -170;
+  const mat = grid.material as THREE.Material;
+  mat.transparent = true;
+  mat.opacity = 0.18;
+  return grid;
+}
+
+// ── Flechas de las conexiones (una o ambas puntas según el tipo) ────────────
+
+function makeArrowCone(): THREE.Mesh {
+  const geo = new THREE.ConeGeometry(2.7, 7.5, 16);
+  const mat = new THREE.MeshLambertMaterial({
+    color: 0xcbd5e1,
+    emissive: 0x475569,
+    emissiveIntensity: 0.6,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+interface GraphLinkObj {
+  id: number;
+  source: number | { x?: number; y?: number; z?: number };
+  target: number | { x?: number; y?: number; z?: number };
+  label?: string;
+  edgeType?: string | null;
+}
+
+function buildLinkObject(link: GraphLinkObj): THREE.Object3D {
+  const group = new THREE.Group();
+  const end = makeArrowCone();
+  end.name = "arrowEnd";
+  group.add(end);
+  if (isBidirectional(link.edgeType)) {
+    const start = makeArrowCone();
+    start.name = "arrowStart";
+    group.add(start);
+  }
+  return group;
+}
+
+const _s = new THREE.Vector3();
+const _e = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _rev = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+const NODE_RADIUS = 8;
+
+function positionLinkArrows(
+  obj: THREE.Object3D,
+  coords: {
+    start: { x: number; y: number; z: number };
+    end: { x: number; y: number; z: number };
+  },
+): boolean {
+  const { start, end } = coords;
+  _s.set(start.x, start.y, start.z);
+  _e.set(end.x, end.y, end.z);
+  _dir.subVectors(_e, _s);
+  const len = _dir.length();
+  if (len === 0) return true;
+  _dir.multiplyScalar(1 / len);
+
+  const endArrow = obj.getObjectByName("arrowEnd");
+  if (endArrow) {
+    endArrow.position.set(
+      _e.x - _dir.x * NODE_RADIUS,
+      _e.y - _dir.y * NODE_RADIUS,
+      _e.z - _dir.z * NODE_RADIUS,
+    );
+    endArrow.quaternion.setFromUnitVectors(_up, _dir);
+  }
+  const startArrow = obj.getObjectByName("arrowStart");
+  if (startArrow) {
+    startArrow.position.set(
+      _s.x + _dir.x * NODE_RADIUS,
+      _s.y + _dir.y * NODE_RADIUS,
+      _s.z + _dir.z * NODE_RADIUS,
+    );
+    _rev.copy(_dir).negate();
+    startArrow.quaternion.setFromUnitVectors(_up, _rev);
+  }
+  return true;
 }
 
 /** Tarjeta (sprite) con icono lucide + nombre que siempre mira a la cámara. */
@@ -182,10 +303,27 @@ function Graph3D({
   connecting,
   onNodeClick,
   onBackgroundClick,
+  onLinkClick,
   onNodeDragEnd,
 }: Graph3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(null);
+  const decoratedRef = useRef(false);
   const [size, setSize] = useState({ width: 800, height: 600 });
+
+  // Añade estrellas, rejilla y niebla a la escena una vez la librería está lista.
+  // Se invoca desde onEngineTick (se ejecuta en cuanto hay datos) con guarda.
+  const decorateScene = () => {
+    const fg = fgRef.current;
+    if (!fg || decoratedRef.current) return;
+    const scene: THREE.Scene | undefined = fg.scene?.();
+    if (!scene) return;
+    decoratedRef.current = true;
+    scene.fog = new THREE.FogExp2(0x0b1120, 0.0006);
+    scene.add(makeStarfield());
+    scene.add(makeGrid());
+  };
 
   useEffect(() => {
     const el = containerRef.current;
@@ -209,9 +347,11 @@ function Graph3D({
       };
     });
     const links = edges.map((e) => ({
+      id: e.id,
       source: e.source_node_id,
       target: e.target_node_id,
       label: e.label ?? undefined,
+      edgeType: e.edge_type,
     }));
     return { nodes: gNodes, links };
   }, [nodes, edges]);
@@ -230,11 +370,13 @@ function Graph3D({
         }
       >
         <ForceGraph3D
+          ref={fgRef}
           width={size.width}
           height={size.height}
           graphData={graphData}
           backgroundColor="#0b1120"
           showNavInfo={false}
+          onEngineTick={decorateScene}
           nodeLabel={(n: GraphNodeObj) =>
             n.node.healthcheck_url
               ? `${n.node.label} · ${n.node.status}`
@@ -245,12 +387,16 @@ function Graph3D({
           }
           linkColor={() => "#64748b"}
           linkWidth={1.2}
-          linkOpacity={0.6}
-          linkDirectionalArrowLength={4.5}
-          linkDirectionalArrowRelPos={1}
-          linkDirectionalParticles={2}
+          linkOpacity={0.55}
+          linkThreeObjectExtend={true}
+          linkThreeObject={(l: GraphLinkObj) => buildLinkObject(l)}
+          linkPositionUpdate={positionLinkArrows}
+          linkDirectionalParticles={(l: GraphLinkObj) =>
+            isBidirectional(l.edgeType) ? 0 : 2
+          }
           linkDirectionalParticleWidth={2}
           linkDirectionalParticleSpeed={0.006}
+          onLinkClick={(l: GraphLinkObj) => onLinkClick?.(l.id)}
           onNodeClick={(n: GraphNodeObj) => onNodeClick?.(n.id)}
           onBackgroundClick={() => onBackgroundClick?.()}
           onNodeDragEnd={(n: GraphNodeObj) => {

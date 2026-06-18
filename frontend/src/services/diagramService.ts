@@ -100,6 +100,16 @@ const diagramService = {
       .then((r) => r.data.data);
   },
 
+  updateEdge(
+    id: number | string,
+    edgeId: number,
+    payload: { label?: string | null; edgeType?: string | null },
+  ): Promise<DiagramEdge> {
+    return apiClient
+      .put(`/api/diagrams/${id}/edges/${edgeId}`, payload)
+      .then((r) => r.data.data);
+  },
+
   deleteEdge(id: number | string, edgeId: number): Promise<void> {
     return apiClient
       .delete(`/api/diagrams/${id}/edges/${edgeId}`)

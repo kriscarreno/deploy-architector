@@ -201,6 +201,21 @@ export class DiagramService {
     return edge;
   }
 
+  async updateEdge(
+    diagramId: number,
+    edgeId: number,
+    userId: number,
+    data: { label?: string | null; edgeType?: string | null },
+  ): Promise<DiagramEdge | null> {
+    await this.assertAccess(diagramId, userId);
+    const edge = await this.edgeRepo.findById(edgeId);
+    if (!edge || edge.diagram_id !== diagramId)
+      throw new NotFoundError("Edge not found");
+    const updated = await this.edgeRepo.update(edgeId, data);
+    await this.diagramRepo.touch(diagramId);
+    return updated;
+  }
+
   async deleteEdge(
     diagramId: number,
     edgeId: number,

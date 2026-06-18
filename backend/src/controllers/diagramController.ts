@@ -52,6 +52,11 @@ const edgeSchema = Joi.object({
   edgeType: Joi.string().trim().max(60).allow("", null),
 });
 
+const updateEdgeSchema = Joi.object({
+  label: Joi.string().trim().max(120).allow("", null),
+  edgeType: Joi.string().trim().max(60).allow("", null),
+});
+
 const layoutSchema = Joi.object({
   positions: Joi.array()
     .items(
@@ -174,6 +179,17 @@ export function makeDiagramController(diagramService) {
         data,
       );
       res.status(201).json({ data: edge });
+    },
+
+    async updateEdge(req, res) {
+      const data = validate(updateEdgeSchema, req.body);
+      const edge = await diagramService.updateEdge(
+        Number(req.params.id),
+        Number(req.params.edgeId),
+        req.user.id,
+        data,
+      );
+      res.json({ data: edge });
     },
 
     async deleteEdge(req, res) {

@@ -31,6 +31,7 @@ function ArchitectureGraphPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<number | null>(null);
+  const [newEdgeBidir, setNewEdgeBidir] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -184,14 +185,49 @@ function ArchitectureGraphPage() {
     [id],
   );
 
+  const isBidir = (t?: string | null) =>
+    ["bidirectional", "both", "<->", "two-way"].includes(
+      (t ?? "").toLowerCase(),
+    );
+
   const createEdge = (source: number, target: number) => {
     diagramService
-      .addEdge(id as string, { sourceNodeId: source, targetNodeId: target })
+      .addEdge(id as string, {
+        sourceNodeId: source,
+        targetNodeId: target,
+        edgeType: newEdgeBidir ? "bidirectional" : "directed",
+      })
       .then((edge) => {
         setDiagram((prev) =>
           prev ? { ...prev, edges: [...prev.edges, edge] } : prev,
         );
-        toastSuccess("Conexión creada");
+        toastSuccess(
+          newEdgeBidir ? "Conexión bidireccional (↔)" : "Conexión creada (→)",
+        );
+      })
+      .catch((err) => toastError(getErrorMessage(err)));
+  };
+
+  const handleLinkClick = (edgeId: number) => {
+    const edge = diagram?.edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    const next = isBidir(edge.edge_type) ? "directed" : "bidirectional";
+    diagramService
+      .updateEdge(id as string, edgeId, { edgeType: next })
+      .then((updated) => {
+        setDiagram((prev) =>
+          prev
+            ? {
+                ...prev,
+                edges: prev.edges.map((e) => (e.id === edgeId ? updated : e)),
+              }
+            : prev,
+        );
+        toastSuccess(
+          next === "bidirectional"
+            ? "Conexión bidireccional (↔)"
+            : "Conexión en un sentido (→)",
+        );
       })
       .catch((err) => toastError(getErrorMessage(err)));
   };
@@ -314,11 +350,25 @@ function ArchitectureGraphPage() {
                 </span>
                 <button
                   className="rounded bg-amber-500/30 px-2 py-0.5 font-medium hover:bg-amber-500/50"
+                  onClick={() => setNewEdgeBidir((v) => !v)}
+                  title="Alterna entre flecha en un extremo o en ambos"
+                >
+                  {newEdgeBidir ? "↔ Ambos extremos" : "→ Un sentido"}
+                </button>
+                <button
+                  className="rounded bg-amber-500/30 px-2 py-0.5 font-medium hover:bg-amber-500/50"
                   onClick={stopConnecting}
                 >
                   Salir
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Leyenda: cómo cambiar la dirección de una conexión */}
+          {!connecting && diagram.edges.length > 0 && (
+            <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg border border-dark-border bg-dark-surface/80 px-3 py-1.5 text-[11px] text-slate-400 shadow">
+              Clic en una conexión para alternar → / ↔
             </div>
           )}
 
@@ -329,6 +379,7 @@ function ArchitectureGraphPage() {
             connecting={connecting}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
+            onLinkClick={handleLinkClick}
             onNodeDragEnd={onNodeDragEnd}
           />
         </div>

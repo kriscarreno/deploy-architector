@@ -32,6 +32,7 @@ export function makeDiagramRouter(diagramCtrl) {
   router.delete("/:id/nodes/:nodeId", asyncHandler(diagramCtrl.deleteNode));
 
   router.post("/:id/edges", asyncHandler(diagramCtrl.addEdge));
+  router.put("/:id/edges/:edgeId", asyncHandler(diagramCtrl.updateEdge));
   router.delete("/:id/edges/:edgeId", asyncHandler(diagramCtrl.deleteEdge));
 
   return router;
