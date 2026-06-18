@@ -431,10 +431,15 @@ function ArchitectureGraphPage() {
         {selectedNode && !connecting && (
           <NodePanel
             node={selectedNode}
+            nodes={diagram.nodes}
+            edges={diagram.edges}
             onClose={() => setSelectedNodeId(null)}
             onSave={saveNode}
             onDelete={deleteNode}
             onStartConnect={(nodeId) => startConnecting(nodeId)}
+            onSetEdgeType={setEdgeType}
+            onInvertEdge={invertEdge}
+            onDeleteEdge={deleteEdgeById}
           />
         )}
 

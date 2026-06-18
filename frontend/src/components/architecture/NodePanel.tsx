@@ -8,15 +8,20 @@ import { Link } from "react-router-dom";
 import Button from "../common/Button";
 import Badge from "../common/Badge";
 import { iconFor } from "./nodeIcon";
-import type { DiagramNode } from "../../types";
+import type { DiagramEdge, DiagramNode } from "../../types";
 import type { NodePayload } from "../../services/diagramService";
 
 interface NodePanelProps {
   node: DiagramNode;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
   onClose: () => void;
   onSave: (nodeId: number, payload: Partial<NodePayload>) => Promise<unknown>;
   onDelete: (nodeId: number) => Promise<unknown>;
   onStartConnect: (nodeId: number) => void;
+  onSetEdgeType: (edgeId: number, type: "directed" | "bidirectional") => void;
+  onInvertEdge: (edge: DiagramEdge) => void;
+  onDeleteEdge: (edgeId: number) => void;
 }
 
 const STATUS_VARIANT: Record<string, "green" | "red" | "gray"> = {
@@ -25,14 +30,30 @@ const STATUS_VARIANT: Record<string, "green" | "red" | "gray"> = {
   unknown: "gray",
 };
 
+function isBidir(t?: string | null): boolean {
+  return ["bidirectional", "both", "<->", "two-way"].includes(
+    (t ?? "").toLowerCase(),
+  );
+}
+
 function NodePanel({
   node,
+  nodes,
+  edges,
   onClose,
   onSave,
   onDelete,
   onStartConnect,
+  onSetEdgeType,
+  onInvertEdge,
+  onDeleteEdge,
 }: NodePanelProps) {
   const isExternal = node.kind === "external";
+  const nameOf = (nodeId: number) =>
+    nodes.find((n) => n.id === nodeId)?.label ?? "?";
+  const connections = edges.filter(
+    (e) => e.source_node_id === node.id || e.target_node_id === node.id,
+  );
   const [label, setLabel] = useState(node.label);
   const [serviceType, setServiceType] = useState(node.service_type ?? "");
   const [url, setUrl] = useState(node.url ?? "");
@@ -152,6 +173,61 @@ function NodePanel({
           {node.notes && <p className="text-slate-400">{node.notes}</p>}
         </div>
       )}
+
+      {/* Conexiones de este nodo */}
+      <div className="border-t border-dark-border pt-3">
+        <span className="form-label">
+          Conexiones ({connections.length})
+        </span>
+        {connections.length === 0 ? (
+          <p className="mt-1 text-xs text-slate-500">
+            Sin conexiones. Usa "Conectar desde aquí".
+          </p>
+        ) : (
+          <ul className="mt-1 flex flex-col gap-2">
+            {connections.map((e) => {
+              const bidir = isBidir(e.edge_type);
+              return (
+                <li
+                  key={e.id}
+                  className="rounded-lg border border-dark-border bg-dark-bg/50 p-2"
+                >
+                  <div className="mb-1 truncate text-xs text-slate-300">
+                    {nameOf(e.source_node_id)} {bidir ? "↔" : "→"}{" "}
+                    {nameOf(e.target_node_id)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        onSetEdgeType(e.id, bidir ? "directed" : "bidirectional")
+                      }
+                      className="rounded bg-dark-surface px-2 py-1 text-xs text-slate-300 hover:bg-dark-border"
+                      title="Alternar un sentido / ambos extremos"
+                    >
+                      {bidir ? "→ Un sentido" : "↔ Ambos"}
+                    </button>
+                    <button
+                      onClick={() => onInvertEdge(e)}
+                      disabled={bidir}
+                      className="rounded bg-dark-surface px-2 py-1 text-xs text-slate-300 hover:bg-dark-border disabled:opacity-40"
+                      title="Invertir el sentido de la flecha"
+                    >
+                      ⇄ Invertir
+                    </button>
+                    <button
+                      onClick={() => onDeleteEdge(e.id)}
+                      className="ml-auto rounded px-2 py-1 text-xs text-slate-400 hover:text-red-400"
+                      title="Eliminar conexión"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-dark-border pt-4">
         <Button variant="secondary" onClick={() => onStartConnect(node.id)}>

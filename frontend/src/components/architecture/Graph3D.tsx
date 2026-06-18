@@ -385,9 +385,9 @@ function Graph3D({
           nodeThreeObject={(n: GraphNodeObj) =>
             buildNodeObject(n.node, n.id === highlightNodeId)
           }
-          linkColor={() => "#64748b"}
-          linkWidth={1.2}
-          linkOpacity={0.55}
+          linkColor={() => "#7c8aa5"}
+          linkWidth={2.2}
+          linkOpacity={0.6}
           linkThreeObjectExtend={true}
           linkThreeObject={(l: GraphLinkObj) => buildLinkObject(l)}
           linkPositionUpdate={positionLinkArrows}
