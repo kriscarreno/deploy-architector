@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Graph3D from "../components/architecture/Graph3D";
 import NodePanel from "../components/architecture/NodePanel";
-import EdgePanel from "../components/architecture/EdgePanel";
+import ManagePanel from "../components/architecture/ManagePanel";
 import AddNodeModal from "../components/architecture/AddNodeModal";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
@@ -29,7 +29,7 @@ function ArchitectureGraphPage() {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
+  const [editingNodeId, setEditingNodeId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<number | null>(null);
@@ -88,18 +88,10 @@ function ArchitectureGraphPage() {
     return () => clearInterval(timer);
   }, [id]);
 
-  const selectedNode = useMemo(
-    () => diagram?.nodes.find((n) => n.id === selectedNodeId) ?? null,
-    [diagram, selectedNodeId],
+  const editingNode = useMemo(
+    () => diagram?.nodes.find((n) => n.id === editingNodeId) ?? null,
+    [diagram, editingNodeId],
   );
-
-  const selectedEdge = useMemo(
-    () => diagram?.edges.find((e) => e.id === selectedEdgeId) ?? null,
-    [diagram, selectedEdgeId],
-  );
-
-  const nodeLabel = (nodeId: number) =>
-    diagram?.nodes.find((n) => n.id === nodeId)?.label ?? "?";
 
   // ── Mutations ───────────────────────────────────────────────────────────
 
@@ -153,6 +145,7 @@ function ArchitectureGraphPage() {
           : prev,
       );
       setSelectedNodeId(null);
+      setEditingNodeId(null);
       toastSuccess("Nodo eliminado");
     } catch (err) {
       toastError(getErrorMessage(err));
@@ -260,16 +253,9 @@ function ArchitectureGraphPage() {
             ? { ...prev, edges: prev.edges.filter((e) => e.id !== edgeId) }
             : prev,
         );
-        setSelectedEdgeId(null);
         toastSuccess("Conexión eliminada");
       })
       .catch((err) => toastError(getErrorMessage(err)));
-
-  const handleLinkClick = (edgeId: number) => {
-    if (connecting) return;
-    setSelectedNodeId(null);
-    setSelectedEdgeId(edgeId);
-  };
 
   const handleNodeClick = (nodeId: number) => {
     if (connecting) {
@@ -286,15 +272,13 @@ function ArchitectureGraphPage() {
       }
       return;
     }
-    setSelectedEdgeId(null);
     setSelectedNodeId(nodeId);
   };
 
   const startConnecting = (fromNodeId?: number) => {
     setConnecting(true);
     setConnectFrom(fromNodeId ?? null);
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
+    setEditingNodeId(null);
   };
 
   const stopConnecting = () => {
@@ -304,10 +288,7 @@ function ArchitectureGraphPage() {
 
   const handleBackgroundClick = () => {
     if (connecting) setConnectFrom(null);
-    else {
-      setSelectedNodeId(null);
-      setSelectedEdgeId(null);
-    }
+    else setSelectedNodeId(null);
   };
 
   const exportDiagram = async () => {
@@ -409,31 +390,24 @@ function ArchitectureGraphPage() {
             </div>
           )}
 
-          {/* Leyenda: cómo editar una conexión */}
-          {!connecting && diagram.edges.length > 0 && (
-            <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg border border-dark-border bg-dark-surface/80 px-3 py-1.5 text-[11px] text-slate-400 shadow">
-              Clic en una conexión para cambiar su dirección o eliminarla
-            </div>
-          )}
-
           <Graph3D
             nodes={diagram.nodes}
             edges={diagram.edges}
-            highlightNodeId={connectFrom}
+            highlightNodeId={connectFrom ?? selectedNodeId}
             connecting={connecting}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
-            onLinkClick={handleLinkClick}
             onNodeDragEnd={onNodeDragEnd}
           />
         </div>
 
-        {selectedNode && !connecting && (
+        {/* Panel derecho: edición de un nodo, o gestión global (siempre visible) */}
+        {editingNode && !connecting ? (
           <NodePanel
-            node={selectedNode}
+            node={editingNode}
             nodes={diagram.nodes}
             edges={diagram.edges}
-            onClose={() => setSelectedNodeId(null)}
+            onClose={() => setEditingNodeId(null)}
             onSave={saveNode}
             onDelete={deleteNode}
             onStartConnect={(nodeId) => startConnecting(nodeId)}
@@ -441,17 +415,17 @@ function ArchitectureGraphPage() {
             onInvertEdge={invertEdge}
             onDeleteEdge={deleteEdgeById}
           />
-        )}
-
-        {selectedEdge && !connecting && (
-          <EdgePanel
-            edge={selectedEdge}
-            sourceLabel={nodeLabel(selectedEdge.source_node_id)}
-            targetLabel={nodeLabel(selectedEdge.target_node_id)}
-            onClose={() => setSelectedEdgeId(null)}
-            onSetType={(type) => setEdgeType(selectedEdge.id, type)}
-            onInvert={() => invertEdge(selectedEdge)}
-            onDelete={() => deleteEdgeById(selectedEdge.id)}
+        ) : (
+          <ManagePanel
+            nodes={diagram.nodes}
+            edges={diagram.edges}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onEditNode={setEditingNodeId}
+            onDeleteNode={deleteNode}
+            onSetEdgeType={setEdgeType}
+            onInvertEdge={invertEdge}
+            onDeleteEdge={deleteEdgeById}
           />
         )}
       </div>
