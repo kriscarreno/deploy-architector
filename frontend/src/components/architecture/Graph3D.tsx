@@ -90,22 +90,22 @@ function makeStarfield(): THREE.Points {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const mat = new THREE.PointsMaterial({
-    color: 0x93c5fd,
-    size: 2.4,
+    color: 0xc7d8ff,
+    size: 2.6,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.85,
     depthWrite: false,
   });
   return new THREE.Points(geo, mat);
 }
 
 function makeGrid(): THREE.GridHelper {
-  const grid = new THREE.GridHelper(2600, 52, 0x2563eb, 0x1e293b);
+  const grid = new THREE.GridHelper(2600, 52, 0x4f7df0, 0x33406b);
   grid.position.y = -170;
   const mat = grid.material as THREE.Material;
   mat.transparent = true;
-  mat.opacity = 0.18;
+  mat.opacity = 0.28;
   return grid;
 }
 
@@ -320,7 +320,7 @@ function Graph3D({
     const scene: THREE.Scene | undefined = fg.scene?.();
     if (!scene) return;
     decoratedRef.current = true;
-    scene.fog = new THREE.FogExp2(0x0b1120, 0.0006);
+    scene.fog = new THREE.FogExp2(0x141d3d, 0.00055);
     scene.add(makeStarfield());
     scene.add(makeGrid());
   };
@@ -374,7 +374,7 @@ function Graph3D({
           width={size.width}
           height={size.height}
           graphData={graphData}
-          backgroundColor="#0b1120"
+          backgroundColor="#141d3d"
           showNavInfo={false}
           onEngineTick={decorateScene}
           nodeLabel={(n: GraphNodeObj) =>

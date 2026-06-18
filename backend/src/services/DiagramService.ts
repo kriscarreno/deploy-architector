@@ -205,12 +205,30 @@ export class DiagramService {
     diagramId: number,
     edgeId: number,
     userId: number,
-    data: { label?: string | null; edgeType?: string | null },
+    data: {
+      label?: string | null;
+      edgeType?: string | null;
+      sourceNodeId?: number | null;
+      targetNodeId?: number | null;
+    },
   ): Promise<DiagramEdge | null> {
     await this.assertAccess(diagramId, userId);
     const edge = await this.edgeRepo.findById(edgeId);
     if (!edge || edge.diagram_id !== diagramId)
       throw new NotFoundError("Edge not found");
+
+    // If endpoints change (e.g. reversing direction), validate them
+    if (data.sourceNodeId != null || data.targetNodeId != null) {
+      const src = data.sourceNodeId ?? edge.source_node_id;
+      const tgt = data.targetNodeId ?? edge.target_node_id;
+      if (src === tgt)
+        throw new ValidationError("An edge cannot connect a node to itself");
+      const nodes = await this.nodeRepo.findAllByDiagram(diagramId);
+      const ids = new Set(nodes.map((n) => n.id));
+      if (!ids.has(src) || !ids.has(tgt))
+        throw new ValidationError("Edge endpoints must belong to this diagram");
+    }
+
     const updated = await this.edgeRepo.update(edgeId, data);
     await this.diagramRepo.touch(diagramId);
     return updated;

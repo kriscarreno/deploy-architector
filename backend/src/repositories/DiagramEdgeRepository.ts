@@ -67,14 +67,32 @@ export class DiagramEdgeRepository {
 
   async update(
     edgeId: number,
-    { label, edgeType }: { label?: string | null; edgeType?: string | null },
+    {
+      label,
+      edgeType,
+      sourceNodeId,
+      targetNodeId,
+    }: {
+      label?: string | null;
+      edgeType?: string | null;
+      sourceNodeId?: number | null;
+      targetNodeId?: number | null;
+    },
   ): Promise<DiagramEdge | null> {
     db.prepare(
       `UPDATE diagram_edges
           SET label = COALESCE(?, label),
-              edge_type = COALESCE(?, edge_type)
+              edge_type = COALESCE(?, edge_type),
+              source_node_id = COALESCE(?, source_node_id),
+              target_node_id = COALESCE(?, target_node_id)
         WHERE id = ?`,
-    ).run(label ?? null, edgeType ?? null, edgeId);
+    ).run(
+      label ?? null,
+      edgeType ?? null,
+      sourceNodeId ?? null,
+      targetNodeId ?? null,
+      edgeId,
+    );
     return this.findById(edgeId);
   }
 

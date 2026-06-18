@@ -103,7 +103,12 @@ const diagramService = {
   updateEdge(
     id: number | string,
     edgeId: number,
-    payload: { label?: string | null; edgeType?: string | null },
+    payload: {
+      label?: string | null;
+      edgeType?: string | null;
+      sourceNodeId?: number;
+      targetNodeId?: number;
+    },
   ): Promise<DiagramEdge> {
     return apiClient
       .put(`/api/diagrams/${id}/edges/${edgeId}`, payload)

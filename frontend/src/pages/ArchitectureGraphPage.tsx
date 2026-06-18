@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Graph3D from "../components/architecture/Graph3D";
 import NodePanel from "../components/architecture/NodePanel";
+import EdgePanel from "../components/architecture/EdgePanel";
 import AddNodeModal from "../components/architecture/AddNodeModal";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
@@ -28,6 +29,7 @@ function ArchitectureGraphPage() {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<number | null>(null);
@@ -90,6 +92,14 @@ function ArchitectureGraphPage() {
     () => diagram?.nodes.find((n) => n.id === selectedNodeId) ?? null,
     [diagram, selectedNodeId],
   );
+
+  const selectedEdge = useMemo(
+    () => diagram?.edges.find((e) => e.id === selectedEdgeId) ?? null,
+    [diagram, selectedEdgeId],
+  );
+
+  const nodeLabel = (nodeId: number) =>
+    diagram?.nodes.find((n) => n.id === nodeId)?.label ?? "?";
 
   // ── Mutations ───────────────────────────────────────────────────────────
 
@@ -185,11 +195,6 @@ function ArchitectureGraphPage() {
     [id],
   );
 
-  const isBidir = (t?: string | null) =>
-    ["bidirectional", "both", "<->", "two-way"].includes(
-      (t ?? "").toLowerCase(),
-    );
-
   const createEdge = (source: number, target: number) => {
     diagramService
       .addEdge(id as string, {
@@ -208,12 +213,17 @@ function ArchitectureGraphPage() {
       .catch((err) => toastError(getErrorMessage(err)));
   };
 
-  const handleLinkClick = (edgeId: number) => {
-    const edge = diagram?.edges.find((e) => e.id === edgeId);
-    if (!edge) return;
-    const next = isBidir(edge.edge_type) ? "directed" : "bidirectional";
+  const applyEdgeUpdate = (
+    edgeId: number,
+    payload: {
+      edgeType?: string;
+      sourceNodeId?: number;
+      targetNodeId?: number;
+    },
+    msg?: string,
+  ) =>
     diagramService
-      .updateEdge(id as string, edgeId, { edgeType: next })
+      .updateEdge(id as string, edgeId, payload)
       .then((updated) => {
         setDiagram((prev) =>
           prev
@@ -223,13 +233,42 @@ function ArchitectureGraphPage() {
               }
             : prev,
         );
-        toastSuccess(
-          next === "bidirectional"
-            ? "Conexión bidireccional (↔)"
-            : "Conexión en un sentido (→)",
-        );
+        if (msg) toastSuccess(msg);
       })
       .catch((err) => toastError(getErrorMessage(err)));
+
+  const setEdgeType = (edgeId: number, type: "directed" | "bidirectional") =>
+    applyEdgeUpdate(
+      edgeId,
+      { edgeType: type },
+      type === "bidirectional" ? "Ambos extremos (↔)" : "Un sentido (→)",
+    );
+
+  const invertEdge = (edge: { id: number; source_node_id: number; target_node_id: number }) =>
+    applyEdgeUpdate(
+      edge.id,
+      { sourceNodeId: edge.target_node_id, targetNodeId: edge.source_node_id },
+      "Sentido invertido",
+    );
+
+  const deleteEdgeById = (edgeId: number) =>
+    diagramService
+      .deleteEdge(id as string, edgeId)
+      .then(() => {
+        setDiagram((prev) =>
+          prev
+            ? { ...prev, edges: prev.edges.filter((e) => e.id !== edgeId) }
+            : prev,
+        );
+        setSelectedEdgeId(null);
+        toastSuccess("Conexión eliminada");
+      })
+      .catch((err) => toastError(getErrorMessage(err)));
+
+  const handleLinkClick = (edgeId: number) => {
+    if (connecting) return;
+    setSelectedNodeId(null);
+    setSelectedEdgeId(edgeId);
   };
 
   const handleNodeClick = (nodeId: number) => {
@@ -247,6 +286,7 @@ function ArchitectureGraphPage() {
       }
       return;
     }
+    setSelectedEdgeId(null);
     setSelectedNodeId(nodeId);
   };
 
@@ -254,6 +294,7 @@ function ArchitectureGraphPage() {
     setConnecting(true);
     setConnectFrom(fromNodeId ?? null);
     setSelectedNodeId(null);
+    setSelectedEdgeId(null);
   };
 
   const stopConnecting = () => {
@@ -263,7 +304,10 @@ function ArchitectureGraphPage() {
 
   const handleBackgroundClick = () => {
     if (connecting) setConnectFrom(null);
-    else setSelectedNodeId(null);
+    else {
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+    }
   };
 
   const exportDiagram = async () => {
@@ -365,10 +409,10 @@ function ArchitectureGraphPage() {
             </div>
           )}
 
-          {/* Leyenda: cómo cambiar la dirección de una conexión */}
+          {/* Leyenda: cómo editar una conexión */}
           {!connecting && diagram.edges.length > 0 && (
             <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg border border-dark-border bg-dark-surface/80 px-3 py-1.5 text-[11px] text-slate-400 shadow">
-              Clic en una conexión para alternar → / ↔
+              Clic en una conexión para cambiar su dirección o eliminarla
             </div>
           )}
 
@@ -391,6 +435,18 @@ function ArchitectureGraphPage() {
             onSave={saveNode}
             onDelete={deleteNode}
             onStartConnect={(nodeId) => startConnecting(nodeId)}
+          />
+        )}
+
+        {selectedEdge && !connecting && (
+          <EdgePanel
+            edge={selectedEdge}
+            sourceLabel={nodeLabel(selectedEdge.source_node_id)}
+            targetLabel={nodeLabel(selectedEdge.target_node_id)}
+            onClose={() => setSelectedEdgeId(null)}
+            onSetType={(type) => setEdgeType(selectedEdge.id, type)}
+            onInvert={() => invertEdge(selectedEdge)}
+            onDelete={() => deleteEdgeById(selectedEdge.id)}
           />
         )}
       </div>

@@ -55,6 +55,8 @@ const edgeSchema = Joi.object({
 const updateEdgeSchema = Joi.object({
   label: Joi.string().trim().max(120).allow("", null),
   edgeType: Joi.string().trim().max(60).allow("", null),
+  sourceNodeId: Joi.number().integer(),
+  targetNodeId: Joi.number().integer(),
 });
 
 const layoutSchema = Joi.object({
