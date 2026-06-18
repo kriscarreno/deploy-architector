@@ -8,9 +8,12 @@
  * La librería (con three.js) se carga de forma diferida para no engordar el
  * bundle principal.
  */
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createElement, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import * as THREE from "three";
+import type { LucideIcon } from "lucide-react";
 import Spinner from "../common/Spinner";
+import { iconFor } from "./nodeIcon";
 import type { DiagramEdge, DiagramNode } from "../../types";
 
 // Carga diferida: three.js + force-graph solo se descargan en esta vista
@@ -22,20 +25,12 @@ const STATUS_COLOR: Record<string, string> = {
   unknown: "#64748b",
 };
 
-/** Emoji por tipo de servicio para dar contexto visual rápido. */
-function iconFor(n: DiagramNode): string {
-  if (n.kind === "project") return "📦";
-  const t = (n.service_type ?? "").toLowerCase();
-  if (t.includes("data") || t.includes("db") || t.includes("postgres") || t.includes("sql"))
-    return "🗄️";
-  if (t.includes("cache") || t.includes("redis")) return "⚡";
-  if (t.includes("queue") || t.includes("kafka") || t.includes("rabbit")) return "📨";
-  if (t.includes("storage") || t.includes("s3") || t.includes("bucket")) return "🪣";
-  if (t.includes("cdn")) return "🌍";
-  if (t.includes("auth")) return "🔐";
-  if (t.includes("webhook")) return "🪝";
-  if (t.includes("api")) return "🔌";
-  return "☁️";
+/** Convierte un icono de lucide-react en una data-URL SVG para pintarlo en canvas. */
+function lucideSvgDataUrl(Icon: LucideIcon, color: string): string {
+  const markup = renderToStaticMarkup(
+    createElement(Icon, { color, size: 64, strokeWidth: 2 }),
+  );
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
 }
 
 /** Color de acento del nodo (borde de la tarjeta + material). */
@@ -70,13 +65,13 @@ interface Graph3DProps {
   ) => void;
 }
 
-/** Tarjeta (sprite) con icono + nombre que siempre mira a la cámara. */
-function makeLabelSprite(text: string, icon: string, accent: string): THREE.Sprite {
+/** Tarjeta (sprite) con icono lucide + nombre que siempre mira a la cámara. */
+function makeLabelSprite(text: string, Icon: LucideIcon, accent: string): THREE.Sprite {
   const dpr = 2;
   const fontSize = 30;
   const padX = 18;
-  const iconW = 38;
-  const gap = 10;
+  const iconW = 36;
+  const gap = 12;
   const height = 64;
 
   const measure = document.createElement("canvas").getContext("2d")!;
@@ -106,12 +101,8 @@ function makeLabelSprite(text: string, icon: string, accent: string): THREE.Spri
   ctx.strokeStyle = accent;
   ctx.stroke();
 
-  // Icono
-  ctx.textBaseline = "middle";
-  ctx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-  ctx.fillText(icon, padX, height / 2 + 1);
-
   // Nombre
+  ctx.textBaseline = "middle";
   ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
   ctx.fillStyle = "#e2e8f0";
   ctx.fillText(label, padX + iconW + gap, height / 2 + 1);
@@ -119,6 +110,15 @@ function makeLabelSprite(text: string, icon: string, accent: string): THREE.Spri
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
+
+  // El icono SVG se rasteriza de forma asíncrona y refresca la textura al cargar
+  const iconImg = new Image();
+  iconImg.onload = () => {
+    const iconY = (height - iconW) / 2;
+    ctx.drawImage(iconImg, padX, iconY, iconW, iconW);
+    texture.needsUpdate = true;
+  };
+  iconImg.src = lucideSvgDataUrl(Icon, accent);
 
   const material = new THREE.SpriteMaterial({
     map: texture,

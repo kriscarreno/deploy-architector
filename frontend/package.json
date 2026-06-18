@@ -16,13 +16,14 @@
     "clsx": "^2.1.0",
     "cronstrue": "^3.14.0",
     "driver.js": "^1.4.0",
+    "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-force-graph-3d": "^1.24.3",
     "react-hook-form": "^7.51.3",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.23.1",
-    "three": "^0.165.0",
+    "three": "^0.184.0",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

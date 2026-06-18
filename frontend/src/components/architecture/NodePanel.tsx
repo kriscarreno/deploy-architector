@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../common/Button";
 import Badge from "../common/Badge";
+import { iconFor } from "./nodeIcon";
 import type { DiagramNode } from "../../types";
 import type { NodePayload } from "../../services/diagramService";
 
@@ -68,11 +69,21 @@ function NodePanel({
   return (
     <aside className="flex h-full w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto border-l border-dark-border bg-dark-surface p-4">
       <div className="flex items-start justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-wide text-slate-500">
-            {isExternal ? "Servicio externo" : "Proyecto"}
-          </span>
-          <h3 className="text-lg font-semibold text-white">{node.label}</h3>
+        <div className="flex items-start gap-3">
+          {(() => {
+            const Icon = iconFor(node);
+            return (
+              <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-dark-bg text-primary-400">
+                <Icon size={20} />
+              </span>
+            );
+          })()}
+          <div>
+            <span className="text-xs uppercase tracking-wide text-slate-500">
+              {isExternal ? "Servicio externo" : "Proyecto"}
+            </span>
+            <h3 className="text-lg font-semibold text-white">{node.label}</h3>
+          </div>
         </div>
         <button
           onClick={onClose}
