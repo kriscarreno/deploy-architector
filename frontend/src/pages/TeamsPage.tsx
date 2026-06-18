@@ -6,17 +6,19 @@
 import { useEffect, useState } from "react";
 import useTeams from "../hooks/useTeams";
 import teamService from "../services/teamService";
+import useAuthStore from "../store/authStore";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
 import Spinner from "../components/common/Spinner";
 import useToast from "../hooks/useToast";
 import { getErrorMessage } from "../utils/errorHandler";
-import type { Team, TeamMember } from "../types";
+import type { Team, TeamMember, TeamRole } from "../types";
 
 function TeamsPage() {
   const { teams, loading, createTeam, deleteTeam, addMember, removeMember } =
     useTeams();
-  const { toastError } = useToast();
+  const { toastError, toastSuccess } = useToast();
+  const currentUser = useAuthStore((s) => s.user);
 
   const [newTeam, setNewTeam] = useState("");
   const [creating, setCreating] = useState(false);
@@ -87,10 +89,31 @@ function TeamsPage() {
     );
   };
 
+  const handleRoleChange = async (member: TeamMember, role: TeamRole) => {
+    if (selectedId == null || role === member.role) return;
+    try {
+      const members = await teamService.updateMemberRole(
+        selectedId,
+        member.id,
+        role,
+      );
+      setDetail((prev) => (prev ? { ...prev, members } : prev));
+      toastSuccess(`${member.username} ahora es ${role}`);
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    }
+  };
+
   const handleDeleteTeam = async (team: Team) => {
     await deleteTeam(team.id);
     if (selectedId === team.id) setSelectedId(null);
   };
+
+  // El rol del usuario actual en el equipo seleccionado decide qué puede hacer
+  const myRole: TeamRole | undefined = detail?.members?.find(
+    (m) => m.id === currentUser?.id,
+  )?.role;
+  const canManageRoles = myRole === "owner";
 
   return (
     <section>
@@ -188,27 +211,47 @@ function TeamsPage() {
                 {detail.members?.map((m) => (
                   <li
                     key={m.id}
-                    className="flex items-center justify-between py-2"
+                    className="flex items-center justify-between gap-2 py-2"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       {m.avatar_url && (
                         <img
                           src={m.avatar_url}
                           alt=""
-                          className="h-7 w-7 rounded-full"
+                          className="h-7 w-7 flex-shrink-0 rounded-full"
                         />
                       )}
-                      <span className="text-sm text-white">{m.username}</span>
-                      <span className="text-xs text-slate-500">{m.role}</span>
+                      <span className="truncate text-sm text-white">
+                        {m.username}
+                      </span>
                     </div>
-                    {m.role !== "owner" && (
-                      <button
-                        onClick={() => handleRemoveMember(m)}
-                        className="text-xs text-slate-500 hover:text-red-400"
-                      >
-                        Quitar
-                      </button>
-                    )}
+
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      {canManageRoles ? (
+                        <select
+                          className="form-input h-8 py-0 text-xs"
+                          value={m.role}
+                          onChange={(e) =>
+                            handleRoleChange(m, e.target.value as TeamRole)
+                          }
+                          aria-label={`Rol de ${m.username}`}
+                        >
+                          <option value="owner">owner</option>
+                          <option value="admin">admin</option>
+                          <option value="member">member</option>
+                        </select>
+                      ) : (
+                        <span className="text-xs text-slate-500">{m.role}</span>
+                      )}
+                      {m.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handleRemoveMember(m)}
+                          className="text-xs text-slate-500 hover:text-red-400"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

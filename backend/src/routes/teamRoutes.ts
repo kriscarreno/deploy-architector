@@ -24,6 +24,7 @@ export function makeTeamRouter(teamCtrl) {
 
   router.get("/:id/members", asyncHandler(teamCtrl.listMembers));
   router.post("/:id/members", asyncHandler(teamCtrl.addMember));
+  router.put("/:id/members/:userId", asyncHandler(teamCtrl.updateMemberRole));
   router.delete("/:id/members/:userId", asyncHandler(teamCtrl.removeMember));
 
   return router;

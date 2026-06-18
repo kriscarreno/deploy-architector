@@ -84,6 +84,43 @@ export class TeamRepository {
     return !!row;
   }
 
+  /** Owner — allowed to manage roles (designate/remove owners). */
+  async isOwner(teamId: number, userId: number): Promise<boolean> {
+    const row = db
+      .prepare(
+        `SELECT 1
+           FROM teams t
+           LEFT JOIN team_members tm
+                  ON tm.team_id = t.id AND tm.user_id = ?
+          WHERE t.id = ?
+            AND (t.owner_id = ? OR tm.role = 'owner')
+          LIMIT 1`,
+      )
+      .get(userId, teamId, userId);
+    return !!row;
+  }
+
+  async countOwners(teamId: number): Promise<number> {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS n
+           FROM team_members
+          WHERE team_id = ? AND role = 'owner'`,
+      )
+      .get(teamId) as unknown as { n: number };
+    return row?.n ?? 0;
+  }
+
+  async updateMemberRole(
+    teamId: number,
+    userId: number,
+    role: TeamRole,
+  ): Promise<void> {
+    db.prepare(
+      `UPDATE team_members SET role = ? WHERE team_id = ? AND user_id = ?`,
+    ).run(role, teamId, userId);
+  }
+
   async addMember(
     teamId: number,
     userId: number,

@@ -36,6 +36,16 @@ const teamService = {
       .then((r) => r.data.data);
   },
 
+  updateMemberRole(
+    id: number | string,
+    userId: number,
+    role: TeamRole,
+  ): Promise<TeamMember[]> {
+    return apiClient
+      .put(`/api/teams/${id}/members/${userId}`, { role })
+      .then((r) => r.data.data);
+  },
+
   removeMember(id: number | string, userId: number): Promise<void> {
     return apiClient
       .delete(`/api/teams/${id}/members/${userId}`)

@@ -20,6 +20,10 @@ const addMemberSchema = Joi.object({
   role: Joi.string().valid("admin", "member").default("member"),
 });
 
+const updateRoleSchema = Joi.object({
+  role: Joi.string().valid("owner", "admin", "member").required(),
+});
+
 function validate(schema, data) {
   const { error, value } = schema.validate(data, {
     abortEarly: false,
@@ -89,6 +93,17 @@ export function makeTeamController(teamService) {
         role,
       );
       res.status(201).json({ data: members });
+    },
+
+    async updateMemberRole(req, res) {
+      const { role } = validate(updateRoleSchema, req.body);
+      const members = await teamService.updateMemberRole(
+        Number(req.params.id),
+        req.user.id,
+        Number(req.params.userId),
+        role,
+      );
+      res.json({ data: members });
     },
 
     async removeMember(req, res) {

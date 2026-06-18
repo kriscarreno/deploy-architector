@@ -66,9 +66,37 @@ export class TeamService {
   async deleteTeam(teamId: number, userId: number): Promise<void> {
     const team = await this.teamRepo.findById(teamId);
     if (!team) throw new NotFoundError("Team not found");
-    if (team.owner_id !== userId)
-      throw new ForbiddenError("Only the owner can delete a team");
+    if (!(await this.teamRepo.isOwner(teamId, userId)))
+      throw new ForbiddenError("Only an owner can delete a team");
     return this.teamRepo.delete(teamId);
+  }
+
+  /** Promote/demote a member's role. Only owners may do this. */
+  async updateMemberRole(
+    teamId: number,
+    userId: number,
+    targetUserId: number,
+    role: TeamRole,
+  ): Promise<TeamMember[]> {
+    await this.getAccessibleTeam(teamId, userId);
+    if (!(await this.teamRepo.isOwner(teamId, userId)))
+      throw new ForbiddenError("Only owners can change member roles");
+    if (!["owner", "admin", "member"].includes(role))
+      throw new ValidationError("Invalid role");
+
+    const members = await this.teamRepo.listMembers(teamId);
+    const target = members.find((m) => m.id === targetUserId);
+    if (!target) throw new NotFoundError("Member not found");
+
+    // Never leave the team without an owner
+    if (target.role === "owner" && role !== "owner") {
+      const owners = members.filter((m) => m.role === "owner").length;
+      if (owners <= 1)
+        throw new ForbiddenError("The team must keep at least one owner");
+    }
+
+    await this.teamRepo.updateMemberRole(teamId, targetUserId, role);
+    return this.teamRepo.listMembers(teamId);
   }
 
   async listMembers(teamId: number, userId: number): Promise<TeamMember[]> {
@@ -106,14 +134,25 @@ export class TeamService {
     userId: number,
     targetUserId: number,
   ): Promise<void> {
-    const team = await this.getAccessibleTeam(teamId, userId);
+    await this.getAccessibleTeam(teamId, userId);
+    const members = await this.teamRepo.listMembers(teamId);
+    const target = members.find((m) => m.id === targetUserId);
+    if (!target) throw new NotFoundError("Member not found");
+
     // Members can remove themselves; otherwise owner/admin required
-    if (targetUserId !== userId) {
-      if (!(await this.teamRepo.isAdmin(teamId, userId)))
-        throw new ForbiddenError("Only owners/admins can remove members");
+    const selfRemoval = targetUserId === userId;
+    if (!selfRemoval && !(await this.teamRepo.isAdmin(teamId, userId)))
+      throw new ForbiddenError("Only owners/admins can remove members");
+
+    // Removing an owner requires owner rights and can't empty the owner set
+    if (target.role === "owner") {
+      if (!(await this.teamRepo.isOwner(teamId, userId)))
+        throw new ForbiddenError("Only owners can remove an owner");
+      const owners = members.filter((m) => m.role === "owner").length;
+      if (owners <= 1)
+        throw new ForbiddenError("The team must keep at least one owner");
     }
-    if (targetUserId === team.owner_id)
-      throw new ForbiddenError("The team owner cannot be removed");
+
     return this.teamRepo.removeMember(teamId, targetUserId);
   }
 }
