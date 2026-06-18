@@ -9,6 +9,9 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+    // Ensure a single three.js instance is shared between our Graph3D code and
+    // react-force-graph-3d (avoids "Multiple instances of Three.js" issues).
+    dedupe: ["three"],
   },
   server: {
     port: 5173,

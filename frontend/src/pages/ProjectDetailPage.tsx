@@ -19,7 +19,6 @@ import projectService from "../services/projectService";
 import deployService from "../services/deployService";
 import envVarService from "../services/envVarService";
 import type { EnvVar, EnvBranch } from "../types";
-import projectService from "../services/projectService";
 import type { RepoEnvFile } from "../types";
 
 // Shared repo form fields

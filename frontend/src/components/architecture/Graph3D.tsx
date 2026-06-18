@@ -1,17 +1,15 @@
 /**
  * @file Graph3D.tsx
  * @description Envoltura de react-force-graph-3d para dibujar nodos (proyectos
- * y servicios externos) y sus conexiones. La librería (con three.js) se carga
- * de forma diferida para no engordar el bundle principal.
+ * y servicios externos) y sus conexiones. Cada nodo se renderiza como un objeto
+ * 3D propio (forma según el tipo de servicio + una tarjeta con icono y nombre)
+ * para que el grafo sea legible y atractivo, no un simple punto.
+ *
+ * La librería (con three.js) se carga de forma diferida para no engordar el
+ * bundle principal.
  */
-import {
-  Suspense,
-  lazy,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
 import Spinner from "../common/Spinner";
 import type { DiagramEdge, DiagramNode } from "../../types";
 
@@ -24,44 +22,166 @@ const STATUS_COLOR: Record<string, string> = {
   unknown: "#64748b",
 };
 
+/** Emoji por tipo de servicio para dar contexto visual rápido. */
+function iconFor(n: DiagramNode): string {
+  if (n.kind === "project") return "📦";
+  const t = (n.service_type ?? "").toLowerCase();
+  if (t.includes("data") || t.includes("db") || t.includes("postgres") || t.includes("sql"))
+    return "🗄️";
+  if (t.includes("cache") || t.includes("redis")) return "⚡";
+  if (t.includes("queue") || t.includes("kafka") || t.includes("rabbit")) return "📨";
+  if (t.includes("storage") || t.includes("s3") || t.includes("bucket")) return "🪣";
+  if (t.includes("cdn")) return "🌍";
+  if (t.includes("auth")) return "🔐";
+  if (t.includes("webhook")) return "🪝";
+  if (t.includes("api")) return "🔌";
+  return "☁️";
+}
+
+/** Color de acento del nodo (borde de la tarjeta + material). */
+function accentColor(n: DiagramNode, highlighted: boolean): string {
+  if (highlighted) return "#f59e0b";
+  if (n.healthcheck_url) return STATUS_COLOR[n.status] ?? STATUS_COLOR.unknown;
+  if (n.color) return n.color;
+  return n.kind === "project" ? "#3b82f6" : "#a855f7";
+}
+
 interface GraphNodeObj {
   id: number;
-  label: string;
-  kind: DiagramNode["kind"];
-  status: DiagramNode["status"];
-  hasHealthcheck: boolean;
-  color: string;
-  fx?: number;
-  fy?: number;
-  fz?: number;
+  node: DiagramNode;
   x?: number;
   y?: number;
   z?: number;
+  fx?: number;
+  fy?: number;
+  fz?: number;
 }
 
 interface Graph3DProps {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   highlightNodeId?: number | null;
+  connecting?: boolean;
   onNodeClick?: (nodeId: number) => void;
+  onBackgroundClick?: () => void;
   onNodeDragEnd?: (
     nodeId: number,
     pos: { posX: number; posY: number; posZ: number },
   ) => void;
 }
 
-function nodeColor(n: DiagramNode, highlighted: boolean): string {
-  if (highlighted) return "#f59e0b";
-  if (n.color) return n.color;
-  if (n.healthcheck_url) return STATUS_COLOR[n.status] ?? STATUS_COLOR.unknown;
-  return n.kind === "project" ? "#3b82f6" : "#a855f7";
+/** Tarjeta (sprite) con icono + nombre que siempre mira a la cámara. */
+function makeLabelSprite(text: string, icon: string, accent: string): THREE.Sprite {
+  const dpr = 2;
+  const fontSize = 30;
+  const padX = 18;
+  const iconW = 38;
+  const gap = 10;
+  const height = 64;
+
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+  const label = text.length > 22 ? `${text.slice(0, 21)}…` : text;
+  const textW = measure.measureText(label).width;
+  const width = padX * 2 + iconW + gap + textW;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(width * dpr);
+  canvas.height = Math.ceil(height * dpr);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(dpr, dpr);
+
+  // Fondo redondeado
+  const r = 16;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.arcTo(width, 0, width, height, r);
+  ctx.arcTo(width, height, 0, height, r);
+  ctx.arcTo(0, height, 0, 0, r);
+  ctx.arcTo(0, 0, width, 0, r);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = accent;
+  ctx.stroke();
+
+  // Icono
+  ctx.textBaseline = "middle";
+  ctx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+  ctx.fillText(icon, padX, height / 2 + 1);
+
+  // Nombre
+  ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillText(label, padX + iconW + gap, height / 2 + 1);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(material);
+  const worldH = 9;
+  sprite.scale.set((worldH * width) / height, worldH, 1);
+  return sprite;
+}
+
+/** Geometría 3D del nodo según su tipo (proyecto / db / genérico). */
+function makeNodeMesh(n: DiagramNode, accent: string, highlighted: boolean): THREE.Mesh {
+  const t = (n.service_type ?? "").toLowerCase();
+  let geometry: THREE.BufferGeometry;
+  if (n.kind === "project") {
+    geometry = new THREE.BoxGeometry(7, 7, 7);
+  } else if (t.includes("data") || t.includes("db") || t.includes("sql")) {
+    geometry = new THREE.CylinderGeometry(4.5, 4.5, 8, 24); // tambor de BD
+  } else {
+    geometry = new THREE.IcosahedronGeometry(5, 0); // gema
+  }
+  const material = new THREE.MeshLambertMaterial({
+    color: new THREE.Color(n.color ?? accent),
+    emissive: new THREE.Color(accent),
+    emissiveIntensity: highlighted ? 0.9 : 0.35,
+  });
+  return new THREE.Mesh(geometry, material);
+}
+
+function buildNodeObject(n: DiagramNode, highlighted: boolean): THREE.Object3D {
+  const accent = accentColor(n, highlighted);
+  const group = new THREE.Group();
+
+  const mesh = makeNodeMesh(n, accent, highlighted);
+  group.add(mesh);
+
+  // Halo de estado (anillo brillante alrededor)
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(highlighted ? 8.5 : 7.5, 16, 16),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(accent),
+      transparent: true,
+      opacity: highlighted ? 0.18 : 0.08,
+    }),
+  );
+  group.add(halo);
+
+  const label = makeLabelSprite(n.label, iconFor(n), accent);
+  label.position.set(0, 10, 0);
+  group.add(label);
+
+  return group;
 }
 
 function Graph3D({
   nodes,
   edges,
   highlightNodeId,
+  connecting,
   onNodeClick,
+  onBackgroundClick,
   onNodeDragEnd,
 }: Graph3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,12 +203,8 @@ function Graph3D({
       const hasPos = n.pos_x !== 0 || n.pos_y !== 0 || n.pos_z !== 0;
       return {
         id: n.id,
-        label: n.label,
-        kind: n.kind,
-        status: n.status,
-        hasHealthcheck: !!n.healthcheck_url,
-        color: nodeColor(n, n.id === highlightNodeId),
-        // Pin nodes that already have a saved layout so it persists
+        node: n,
+        // Fija los nodos que ya tienen layout guardado para que persista
         ...(hasPos ? { fx: n.pos_x, fy: n.pos_y, fz: n.pos_z } : {}),
       };
     });
@@ -98,10 +214,14 @@ function Graph3D({
       label: e.label ?? undefined,
     }));
     return { nodes: gNodes, links };
-  }, [nodes, edges, highlightNodeId]);
+  }, [nodes, edges]);
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      style={{ cursor: connecting ? "crosshair" : undefined }}
+    >
       <Suspense
         fallback={
           <div className="flex h-full w-full items-center justify-center">
@@ -114,22 +234,26 @@ function Graph3D({
           height={size.height}
           graphData={graphData}
           backgroundColor="#0b1120"
+          showNavInfo={false}
           nodeLabel={(n: GraphNodeObj) =>
-            `${n.label}${n.hasHealthcheck ? ` · ${n.status}` : ""}`
+            n.node.healthcheck_url
+              ? `${n.node.label} · ${n.node.status}`
+              : n.node.label
           }
-          nodeColor={(n: GraphNodeObj) => n.color}
-          nodeOpacity={0.95}
-          nodeRelSize={6}
-          nodeResolution={16}
-          linkColor={() => "#475569"}
-          linkWidth={1.5}
-          linkDirectionalArrowLength={4}
+          nodeThreeObject={(n: GraphNodeObj) =>
+            buildNodeObject(n.node, n.id === highlightNodeId)
+          }
+          linkColor={() => "#64748b"}
+          linkWidth={1.2}
+          linkOpacity={0.6}
+          linkDirectionalArrowLength={4.5}
           linkDirectionalArrowRelPos={1}
-          linkDirectionalParticles={1}
-          linkDirectionalParticleWidth={1.5}
+          linkDirectionalParticles={2}
+          linkDirectionalParticleWidth={2}
+          linkDirectionalParticleSpeed={0.006}
           onNodeClick={(n: GraphNodeObj) => onNodeClick?.(n.id)}
+          onBackgroundClick={() => onBackgroundClick?.()}
           onNodeDragEnd={(n: GraphNodeObj) => {
-            // Pin the node where it was dropped and persist
             n.fx = n.x;
             n.fy = n.y;
             n.fz = n.z;

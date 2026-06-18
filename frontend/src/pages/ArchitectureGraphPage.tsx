@@ -29,6 +29,7 @@ function ArchitectureGraphPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [connectFrom, setConnectFrom] = useState<number | null>(null);
 
   // Initial load
@@ -183,25 +184,50 @@ function ArchitectureGraphPage() {
     [id],
   );
 
+  const createEdge = (source: number, target: number) => {
+    diagramService
+      .addEdge(id as string, { sourceNodeId: source, targetNodeId: target })
+      .then((edge) => {
+        setDiagram((prev) =>
+          prev ? { ...prev, edges: [...prev.edges, edge] } : prev,
+        );
+        toastSuccess("Conexión creada");
+      })
+      .catch((err) => toastError(getErrorMessage(err)));
+  };
+
   const handleNodeClick = (nodeId: number) => {
-    if (connectFrom != null && connectFrom !== nodeId) {
-      // Complete an edge
-      diagramService
-        .addEdge(id as string, {
-          sourceNodeId: connectFrom,
-          targetNodeId: nodeId,
-        })
-        .then((edge) => {
-          setDiagram((prev) =>
-            prev ? { ...prev, edges: [...prev.edges, edge] } : prev,
-          );
-          toastSuccess("Conexión creada");
-        })
-        .catch((err) => toastError(getErrorMessage(err)))
-        .finally(() => setConnectFrom(null));
+    if (connecting) {
+      if (connectFrom == null) {
+        // First click: pick the source
+        setConnectFrom(nodeId);
+      } else if (connectFrom === nodeId) {
+        // Clicked the source again: deselect it
+        setConnectFrom(null);
+      } else {
+        // Second click: create the edge and chain into a new connection
+        createEdge(connectFrom, nodeId);
+        setConnectFrom(null);
+      }
       return;
     }
     setSelectedNodeId(nodeId);
+  };
+
+  const startConnecting = (fromNodeId?: number) => {
+    setConnecting(true);
+    setConnectFrom(fromNodeId ?? null);
+    setSelectedNodeId(null);
+  };
+
+  const stopConnecting = () => {
+    setConnecting(false);
+    setConnectFrom(null);
+  };
+
+  const handleBackgroundClick = () => {
+    if (connecting) setConnectFrom(null);
+    else setSelectedNodeId(null);
   };
 
   const exportDiagram = async () => {
@@ -247,17 +273,14 @@ function ArchitectureGraphPage() {
           <h1 className="text-xl font-bold text-white">{diagram.name}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {connectFrom != null && (
-            <span className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs text-amber-300">
-              Selecciona el nodo destino…
-              <button
-                className="ml-2 underline"
-                onClick={() => setConnectFrom(null)}
-              >
-                cancelar
-              </button>
-            </span>
-          )}
+          <Button
+            variant={connecting ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => (connecting ? stopConnecting() : startConnecting())}
+            disabled={diagram.nodes.length < 2}
+          >
+            {connecting ? "✓ Conectando…" : "🔗 Conectar nodos"}
+          </Button>
           <Button variant="secondary" size="sm" onClick={exportDiagram}>
             Exportar JSON
           </Button>
@@ -279,25 +302,44 @@ function ArchitectureGraphPage() {
               </p>
             </div>
           )}
+
+          {/* Banner de modo conexión */}
+          {connecting && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+              <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-amber-500/40 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-200 shadow-lg">
+                <span>
+                  {connectFrom == null
+                    ? "Modo conexión: haz clic en el nodo de ORIGEN"
+                    : "Ahora haz clic en el nodo de DESTINO"}
+                </span>
+                <button
+                  className="rounded bg-amber-500/30 px-2 py-0.5 font-medium hover:bg-amber-500/50"
+                  onClick={stopConnecting}
+                >
+                  Salir
+                </button>
+              </div>
+            </div>
+          )}
+
           <Graph3D
             nodes={diagram.nodes}
             edges={diagram.edges}
             highlightNodeId={connectFrom}
+            connecting={connecting}
             onNodeClick={handleNodeClick}
+            onBackgroundClick={handleBackgroundClick}
             onNodeDragEnd={onNodeDragEnd}
           />
         </div>
 
-        {selectedNode && (
+        {selectedNode && !connecting && (
           <NodePanel
             node={selectedNode}
             onClose={() => setSelectedNodeId(null)}
             onSave={saveNode}
             onDelete={deleteNode}
-            onStartConnect={(nodeId) => {
-              setConnectFrom(nodeId);
-              setSelectedNodeId(null);
-            }}
+            onStartConnect={(nodeId) => startConnecting(nodeId)}
           />
         )}
       </div>
