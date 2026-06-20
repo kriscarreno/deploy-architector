@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import useProjects from "../hooks/useProjects";
 import Button from "../components/common/Button";
@@ -103,6 +103,26 @@ const ProjectCard = memo(function ProjectCard({
             Creado {new Date(project.created_at).toLocaleDateString("es-ES")}
           </span>
         )}
+      </div>
+
+      {/* Acciones rápidas — no propagar para no abrir el detalle dos veces */}
+      <div
+        className="mt-3 flex flex-wrap gap-1.5 border-t border-dark-border pt-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {[
+          { to: `/projects/${project.id}`, label: "Detalle" },
+          { to: `/projects/${project.id}/status`, label: "Estado" },
+          { to: `/projects/${project.id}/healthchecks`, label: "Healthchecks" },
+        ].map((a) => (
+          <Link
+            key={a.label}
+            to={a.to}
+            className="rounded-md bg-dark-bg px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-dark-border hover:text-white"
+          >
+            {a.label}
+          </Link>
+        ))}
       </div>
     </article>
   );

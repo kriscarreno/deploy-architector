@@ -178,6 +178,20 @@ function DashboardPage() {
   const { toastError, toastSuccess } = useToast();
   const navigate = useNavigate();
 
+  const publicStatusUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/status/public`
+      : "/status/public";
+
+  const copyStatusUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(publicStatusUrl);
+      toastSuccess("Enlace copiado al portapapeles");
+    } catch {
+      toastError("No se pudo copiar el enlace");
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -291,6 +305,34 @@ function DashboardPage() {
             Ver proyectos
           </Button>
           <Button onClick={() => setModalOpen(true)}>+ Nuevo proyecto</Button>
+        </div>
+      </div>
+
+      {/* Página de estado pública — enlace para compartir */}
+      <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+            Página de estado pública
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Comparte el estado de tus servicios (sin login).
+          </p>
+          <code className="mt-1 block truncate text-sm text-primary-300">
+            {publicStatusUrl}
+          </code>
+        </div>
+        <div className="flex flex-shrink-0 gap-2">
+          <Button variant="secondary" onClick={copyStatusUrl}>
+            Copiar enlace
+          </Button>
+          <a
+            href="/status/public"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary"
+          >
+            Abrir
+          </a>
         </div>
       </div>
 
