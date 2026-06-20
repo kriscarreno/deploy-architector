@@ -4,6 +4,7 @@
  * todos los healthchecks configurados como públicos con su estado up/down,
  * latencia y código HTTP. Se refresca por polling.
  */
+import { useCallback } from "react";
 import usePolling from "../hooks/usePolling";
 import statusService from "../services/statusService";
 import type { PublicStatusProject, HealthStatus } from "../types";
@@ -25,9 +26,10 @@ function relTime(iso: string | null): string {
 }
 
 function PublicStatusPage() {
-  const { data, loading } = usePolling(() => statusService.getPublicStatus(), {
-    interval: 20_000,
-  });
+  // Memoizado: usePolling depende de la identidad de la función; una función
+  // inline aquí provocaría re-suscripciones y un bucle de peticiones.
+  const fetchStatus = useCallback(() => statusService.getPublicStatus(), []);
+  const { data, loading } = usePolling(fetchStatus, { interval: 20_000 });
   const projects = (data as PublicStatusProject[] | null) ?? [];
 
   const allChecks = projects.flatMap((p) => p.checks);

@@ -152,7 +152,7 @@ app.use(compression());
 // más capas de proxy lo resolvemos explícitamente desde X-Forwarded-For.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 1000, // 1000 req / 15 min por IP (~1 req/s)
+  limit: 1000, // 1000 req / 15 min por IP (~1 req/s) — v7: "limit" (antes "max")
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
