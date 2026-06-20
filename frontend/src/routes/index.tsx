@@ -25,6 +25,10 @@ const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const TransparencyPage = lazy(() => import("../pages/TransparencyPage"));
 const StatusPage = lazy(() => import("../pages/StatusPage"));
 const GlobalStatusPage = lazy(() => import("../pages/GlobalStatusPage"));
+const HealthcheckConfigPage = lazy(
+  () => import("../pages/HealthcheckConfigPage"),
+);
+const PublicStatusPage = lazy(() => import("../pages/PublicStatusPage"));
 
 /** Fallback de suspense global */
 const PageFallback = () => (
@@ -54,6 +58,15 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<PageFallback />}>
         <AuthCallbackPage />
+      </Suspense>
+    ),
+  },
+  // Página de estado PÚBLICA (sin sesión)
+  {
+    path: "/status/public",
+    element: (
+      <Suspense fallback={<PageFallback />}>
+        <PublicStatusPage />
       </Suspense>
     ),
   },
@@ -90,6 +103,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <StatusPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/projects/:id/healthchecks",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <HealthcheckConfigPage />
           </Suspense>
         ),
       },

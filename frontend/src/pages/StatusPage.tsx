@@ -195,9 +195,17 @@ export default function StatusPage() {
             </p>
           )}
         </div>
-        <Button onClick={check} loading={checking} disabled={checking}>
-          {checking ? "Verificando..." : "Verificar ahora"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/projects/${id}/healthchecks`}
+            className="rounded-lg border border-dark-border px-3 py-2 text-sm text-slate-300 hover:bg-dark-surface hover:text-white"
+          >
+            Configurar healthchecks
+          </Link>
+          <Button onClick={check} loading={checking} disabled={checking}>
+            {checking ? "Verificando..." : "Verificar ahora"}
+          </Button>
+        </div>
       </div>
 
       {/* No repos */}

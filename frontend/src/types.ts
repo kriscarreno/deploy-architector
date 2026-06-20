@@ -40,10 +40,42 @@ export interface Project {
   atomic: number;
   cron_expression: string | null;
   cron_enabled: number;
+  status_base_url?: string | null;
+  status_public?: number;
   created_at: string;
   updated_at: string;
   repos?: Repo[];
   repo_count?: number;
+}
+
+export type HealthStatus = "unknown" | "up" | "down";
+
+export interface ProjectHealthcheck {
+  id: number;
+  project_id: number;
+  name: string;
+  url: string;
+  order_index: number;
+  status: HealthStatus;
+  status_code: number | null;
+  latency_ms: number | null;
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicStatusCheck {
+  name: string;
+  status: HealthStatus;
+  statusCode: number | null;
+  latencyMs: number | null;
+  lastCheckedAt: string | null;
+}
+
+export interface PublicStatusProject {
+  projectId: number;
+  projectName: string;
+  checks: PublicStatusCheck[];
 }
 
 export interface RepoEnvFile {

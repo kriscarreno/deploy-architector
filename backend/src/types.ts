@@ -27,10 +27,30 @@ export interface Project {
   cron_expression: string | null;
   /** SQLite boolean: 1 = enabled */
   cron_enabled: number;
+  /** Base URL prepended to relative healthcheck paths (status page) */
+  status_base_url: string | null;
+  /** SQLite boolean: 1 = shown on the public status page */
+  status_public: number;
   created_at: string;
   updated_at: string;
   /** Only present in list queries (COUNT subquery) */
   repo_count?: number;
+}
+
+export type HealthStatus = "unknown" | "up" | "down";
+
+export interface ProjectHealthcheck {
+  id: number;
+  project_id: number;
+  name: string;
+  url: string;
+  order_index: number;
+  status: HealthStatus;
+  status_code: number | null;
+  latency_ms: number | null;
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Repo {

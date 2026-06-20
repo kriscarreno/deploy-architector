@@ -156,6 +156,21 @@ const migrations = [
     created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE(diagram_id, source_node_id, target_node_id)
   )`,
+
+  // ── Per-project healthcheck endpoints (status page) ──────────────────────
+  `CREATE TABLE IF NOT EXISTS project_healthchecks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name            TEXT    NOT NULL,
+    url             TEXT    NOT NULL, -- absolute, or relative to projects.status_base_url
+    order_index     INTEGER NOT NULL DEFAULT 0,
+    status          TEXT    NOT NULL DEFAULT 'unknown', -- 'unknown' | 'up' | 'down'
+    status_code     INTEGER,
+    latency_ms      INTEGER,
+    last_checked_at TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 // Run all migrations in a single transaction
@@ -179,6 +194,8 @@ const alterMigrations = [
   `ALTER TABLE repos    ADD COLUMN workflow_file         TEXT NOT NULL DEFAULT 'deploy.yml'`,
   `ALTER TABLE repos    ADD COLUMN main_workflow_file    TEXT NOT NULL DEFAULT 'deploy.yml'`,
   `ALTER TABLE repos    ADD COLUMN prod_workflow_file    TEXT NOT NULL DEFAULT 'deploy.yml'`,
+  `ALTER TABLE projects ADD COLUMN status_base_url       TEXT`,
+  `ALTER TABLE projects ADD COLUMN status_public         INTEGER NOT NULL DEFAULT 0`,
 ];
 
 for (const sql of alterMigrations) {

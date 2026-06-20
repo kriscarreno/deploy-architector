@@ -145,6 +145,27 @@ export class ProjectRepository {
     return this.findById(projectId);
   }
 
+  async updateStatusConfig(
+    projectId: number,
+    {
+      statusBaseUrl,
+      statusPublic,
+    }: { statusBaseUrl?: string | null; statusPublic?: boolean },
+  ): Promise<Project | null> {
+    db.prepare(
+      `UPDATE projects
+          SET status_base_url = COALESCE(?, status_base_url),
+              status_public   = COALESCE(?, status_public),
+              updated_at      = datetime('now')
+        WHERE id = ?`,
+    ).run(
+      statusBaseUrl === undefined ? null : statusBaseUrl,
+      statusPublic != null ? (statusPublic ? 1 : 0) : null,
+      projectId,
+    );
+    return this.findById(projectId);
+  }
+
   /** Returns all projects that have an active cron schedule. */
   async findAllCronEnabled(): Promise<Project[]> {
     return db

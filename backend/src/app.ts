@@ -32,6 +32,7 @@ import { TeamRepository } from "./repositories/TeamRepository.js";
 import { DiagramRepository } from "./repositories/DiagramRepository.js";
 import { DiagramNodeRepository } from "./repositories/DiagramNodeRepository.js";
 import { DiagramEdgeRepository } from "./repositories/DiagramEdgeRepository.js";
+import { ProjectHealthcheckRepository } from "./repositories/ProjectHealthcheckRepository.js";
 
 // Services
 import { ProjectService } from "./services/ProjectService.js";
@@ -39,6 +40,7 @@ import { DeployService } from "./services/DeployService.js";
 import { EnvVarService } from "./services/EnvVarService.js";
 import { TeamService } from "./services/TeamService.js";
 import { DiagramService } from "./services/DiagramService.js";
+import { StatusService } from "./services/StatusService.js";
 
 // Queue
 import { deployQueue } from "./queues/deployQueue.js";
@@ -49,6 +51,7 @@ import { makeDeployController } from "./controllers/deployController.js";
 import { makeEnvVarController } from "./controllers/envVarController.js";
 import { makeTeamController } from "./controllers/teamController.js";
 import { makeDiagramController } from "./controllers/diagramController.js";
+import { makeStatusController } from "./controllers/statusController.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -59,6 +62,10 @@ import { makeConfigRouter } from "./routes/configRoutes.js";
 import { makeEnvVarRouter } from "./routes/envVarRoutes.js";
 import { makeTeamRouter } from "./routes/teamRoutes.js";
 import { makeDiagramRouter } from "./routes/diagramRoutes.js";
+import {
+  makeStatusRouter,
+  makePublicStatusRouter,
+} from "./routes/statusRoutes.js";
 
 // Middlewares
 import { correlationId } from "./middlewares/correlationId.js";
@@ -76,6 +83,7 @@ const teamRepo = new TeamRepository();
 const diagramRepo = new DiagramRepository();
 const diagramNodeRepo = new DiagramNodeRepository();
 const diagramEdgeRepo = new DiagramEdgeRepository();
+const healthcheckRepo = new ProjectHealthcheckRepository();
 
 // ── Configure Passport (inject userRepo) ──────────────────────────────────
 configurePassport(userRepo);
@@ -102,6 +110,7 @@ const diagramService = new DiagramService(
   projectRepo,
   teamRepo,
 );
+const statusService = new StatusService(projectRepo, healthcheckRepo);
 
 // ── Instantiate controllers ───────────────────────────────────────────────
 const projectCtrl = makeProjectController(projectService);
@@ -109,6 +118,7 @@ const deployCtrl = makeDeployController(deployService);
 const envVarCtrl = makeEnvVarController(envVarService);
 const teamCtrl = makeTeamController(teamService);
 const diagramCtrl = makeDiagramController(diagramService);
+const statusCtrl = makeStatusController(statusService);
 
 // ── Build Express app ─────────────────────────────────────────────────────
 const app = express();
@@ -203,6 +213,8 @@ if (env.NODE_ENV !== "production") {
 
 // ── Routes ────────────────────────────────────────────────────────────────
 app.use("/auth", authRoutes);
+// Public status aggregate (NO auth) — registered before the broad "/api" router
+app.use("/api/public-status", makePublicStatusRouter(statusCtrl));
 app.use("/api/projects", makeProjectRouter(projectCtrl, deployCtrl));
 app.use("/api/projects/:id/repos/:repoId/env", makeEnvVarRouter(envVarCtrl));
 app.use("/api/jobs", makeJobRouter(deployCtrl));
@@ -210,6 +222,8 @@ app.use("/api/github", githubRoutes);
 app.use("/api/config", makeConfigRouter(projectRepo, repoRepo));
 app.use("/api/teams", makeTeamRouter(teamCtrl));
 app.use("/api/diagrams", makeDiagramRouter(diagramCtrl));
+// Per-project healthcheck CRUD + config (authenticated, broad — registered last)
+app.use("/api", makeStatusRouter(statusCtrl));
 
 // ── Health check (no auth) ────────────────────────────────────────────────
 app.get("/health", (_req, res) =>
