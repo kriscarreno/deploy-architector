@@ -97,6 +97,32 @@ export class StatusService {
   }
 
   /**
+   * Per-project health summary for the projects the user can access.
+   * status = down if any check is down, up if any up, else unknown.
+   */
+  async getProjectsSummary(
+    userId: number,
+  ): Promise<
+    { projectId: number; status: string; up: number; total: number }[]
+  > {
+    const rows = await this.hcRepo.findStatusesByUser(userId);
+    const map = new Map<number, { total: number; up: number; down: number }>();
+    for (const r of rows) {
+      const e = map.get(r.project_id) ?? { total: 0, up: 0, down: 0 };
+      e.total++;
+      if (r.status === "up") e.up++;
+      else if (r.status === "down") e.down++;
+      map.set(r.project_id, e);
+    }
+    return Array.from(map.entries()).map(([projectId, e]) => ({
+      projectId,
+      total: e.total,
+      up: e.up,
+      status: e.down > 0 ? "down" : e.up > 0 ? "up" : "unknown",
+    }));
+  }
+
+  /**
    * Public, unauthenticated aggregate. Groups checks by project, only for
    * projects flagged public, exposing names/status but NOT the raw URLs.
    */

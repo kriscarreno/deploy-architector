@@ -11,9 +11,16 @@ import Modal from "../components/common/Modal";
 import Input from "../components/common/Input";
 import Spinner from "../components/common/Spinner";
 import Badge, { statusVariant } from "../components/common/Badge";
+import useHealthSummary from "../hooks/useHealthSummary";
 import { projectNameRules } from "../utils/validators";
 import { formatDate } from "../utils/formatDate";
-import type { Project, DeployJob } from "../types";
+import type { HealthStatus, Project, DeployJob } from "../types";
+
+const HEALTH_DOT: Record<HealthStatus, string> = {
+  up: "bg-green-500",
+  down: "bg-red-500",
+  unknown: "bg-slate-500",
+};
 
 interface CreateProjectForm {
   name: string;
@@ -177,6 +184,7 @@ function DashboardPage() {
   } = useProjects();
   const { toastError, toastSuccess } = useToast();
   const navigate = useNavigate();
+  const health = useHealthSummary();
 
   const publicStatusUrl =
     typeof window !== "undefined"
@@ -479,33 +487,53 @@ function DashboardPage() {
                 recentProjects.map((p) => (
                   <div
                     key={p.id}
-                    className="flex cursor-pointer items-center justify-between gap-3 border-b border-dark-border py-2.5 last:border-0 hover:text-primary-400 transition-colors"
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && navigate(`/projects/${p.id}`)
-                    }
+                    className="border-b border-dark-border py-2.5 last:border-0"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">
-                        {p.name}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {p.repo_count ?? 0} repos ·{" "}
-                        {p.created_at
-                          ? new Date(p.created_at).toLocaleDateString("es-ES")
-                          : "—"}
-                      </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/projects/${p.id}`)}
+                        className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-primary-400"
+                      >
+                        {health[p.id] && (
+                          <span
+                            className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${HEALTH_DOT[health[p.id]]}`}
+                            title={`Estado: ${health[p.id]}`}
+                          />
+                        )}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-white">
+                            {p.name}
+                          </span>
+                          <span className="block text-xs text-slate-500">
+                            {p.repo_count ?? 0} repos ·{" "}
+                            {p.created_at
+                              ? new Date(p.created_at).toLocaleDateString(
+                                  "es-ES",
+                                )
+                              : "—"}
+                          </span>
+                        </span>
+                      </button>
                     </div>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 flex-shrink-0 text-slate-600"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
-                    </svg>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {[
+                        { to: `/projects/${p.id}`, label: "Detalle" },
+                        { to: `/projects/${p.id}/status`, label: "Estado" },
+                        {
+                          to: `/projects/${p.id}/healthchecks`,
+                          label: "Healthchecks",
+                        },
+                      ].map((a) => (
+                        <Link
+                          key={a.label}
+                          to={a.to}
+                          className="rounded-md bg-dark-bg px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-dark-border hover:text-white"
+                        >
+                          {a.label}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 ))
               )}

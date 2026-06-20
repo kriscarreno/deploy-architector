@@ -94,6 +94,24 @@ export class ProjectHealthcheckRepository {
     ).run(status, statusCode, latencyMs, id);
   }
 
+  /** (project_id, status) for every healthcheck of projects the user can access. */
+  async findStatusesByUser(
+    userId: number,
+  ): Promise<{ project_id: number; status: HealthStatus }[]> {
+    return db
+      .prepare(
+        `SELECT DISTINCT hc.id, hc.project_id, hc.status
+           FROM project_healthchecks hc
+           JOIN projects p ON p.id = hc.project_id
+           LEFT JOIN project_members pm ON pm.project_id = p.id
+          WHERE p.owner_id = ? OR pm.user_id = ?`,
+      )
+      .all(userId, userId) as unknown as {
+      project_id: number;
+      status: HealthStatus;
+    }[];
+  }
+
   /** All healthchecks across all projects, joined with project base URL. */
   async findAllWithProject(): Promise<HealthcheckWithProject[]> {
     return db

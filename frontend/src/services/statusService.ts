@@ -5,6 +5,7 @@
  */
 import apiClient from "./apiClient";
 import type {
+  HealthStatus,
   Project,
   ProjectHealthcheck,
   PublicStatusProject,
@@ -57,6 +58,13 @@ const statusService = {
     return apiClient
       .put(`/api/projects/${projectId}/status-config`, payload)
       .then((r) => r.data.data);
+  },
+
+  /** Per-project health summary for the current user (status dots). */
+  getSummary(): Promise<
+    { projectId: number; status: HealthStatus; up: number; total: number }[]
+  > {
+    return apiClient.get("/api/status/summary").then((r) => r.data.data);
   },
 
   /** Public — no auth required. */

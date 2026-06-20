@@ -6,8 +6,15 @@ import Button from "../components/common/Button";
 import Modal from "../components/common/Modal";
 import Input from "../components/common/Input";
 import Spinner from "../components/common/Spinner";
+import useHealthSummary from "../hooks/useHealthSummary";
 import { projectNameRules } from "../utils/validators";
-import type { Project } from "../types";
+import type { HealthStatus, Project } from "../types";
+
+const HEALTH_DOT: Record<HealthStatus, string> = {
+  up: "bg-green-500",
+  down: "bg-red-500",
+  unknown: "bg-slate-500",
+};
 
 interface CreateProjectForm {
   name: string;
@@ -17,11 +24,13 @@ interface CreateProjectForm {
 // ── Tarjeta de proyecto ───────────────────────────────────────────────────
 const ProjectCard = memo(function ProjectCard({
   project,
+  status,
   onClick,
   onEdit,
   onDelete,
 }: {
   project: Project;
+  status?: HealthStatus;
   onClick: () => void;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
@@ -37,7 +46,13 @@ const ProjectCard = memo(function ProjectCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold text-white">
+          <h2 className="flex items-center gap-2 truncate text-base font-semibold text-white">
+            {status && (
+              <span
+                className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${HEALTH_DOT[status]}`}
+                title={`Estado: ${status}`}
+              />
+            )}
             {project.name}
           </h2>
           {project.description && (
@@ -346,6 +361,7 @@ function ProjectsPage() {
     updateProject,
     deleteProject: doDelete,
   } = useProjects();
+  const health = useHealthSummary();
   const navigate = useNavigate();
 
   const handleEdit = async (data: CreateProjectForm) => {
@@ -425,6 +441,7 @@ function ProjectsPage() {
             <ProjectCard
               key={p.id}
               project={p}
+              status={health[p.id]}
               onClick={() => navigate(`/projects/${p.id}`)}
               onEdit={(e) => {
                 e.stopPropagation();

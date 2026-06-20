@@ -18,6 +18,9 @@ export function makeStatusRouter(statusCtrl) {
   const router = Router();
   router.use(requireAuth);
 
+  // Health summary across the user's projects (for status dots)
+  router.get("/status/summary", asyncHandler(statusCtrl.getSummary));
+
   router.get(
     "/projects/:id/healthchecks",
     asyncHandler(statusCtrl.listHealthchecks),

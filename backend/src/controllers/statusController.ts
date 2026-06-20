@@ -99,6 +99,11 @@ export function makeStatusController(statusService) {
       res.json({ data: project });
     },
 
+    async getSummary(req, res) {
+      const data = await statusService.getProjectsSummary(req.user.id);
+      res.json({ data });
+    },
+
     // Public — no auth
     async getPublicStatus(_req, res) {
       const data = await statusService.getPublicStatus();
