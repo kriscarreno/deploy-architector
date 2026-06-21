@@ -14,9 +14,20 @@ import useToast from "../hooks/useToast";
 import { getErrorMessage } from "../utils/errorHandler";
 import type { ProjectHealthcheck } from "../types";
 
+/** Set estándar de healthchecks (rutas relativas a la URL base del proyecto). */
+const DEFAULT_HEALTHCHECKS: { name: string; url: string }[] = [
+  { name: "Database Tests", url: "/api/healthz/database" },
+  { name: "Logs DB Tests", url: "/api/healthz/logs" },
+  { name: "Database EF Tests", url: "/api/healthz/database-ef" },
+  { name: "Cache Tests", url: "/api/healthz/cache" },
+  { name: "Messaging Tests", url: "/api/healthz/messaging" },
+  { name: "System Tests", url: "/api/healthz/system" },
+  { name: "External Services", url: "/api/healthz/external" },
+];
+
 function HealthcheckConfigPage() {
   const { id } = useParams<{ id: string }>();
-  const { toastError, toastSuccess } = useToast();
+  const { toastError, toastSuccess, toastInfo } = useToast();
 
   const [projectName, setProjectName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -29,6 +40,7 @@ function HealthcheckConfigPage() {
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [adding, setAdding] = useState(false);
+  const [addingDefaults, setAddingDefaults] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +99,35 @@ function HealthcheckConfigPage() {
       toastError(getErrorMessage(err));
     } finally {
       setAdding(false);
+    }
+  };
+
+  const addDefaults = async () => {
+    setAddingDefaults(true);
+    try {
+      const existing = new Set(checks.map((c) => c.name.toLowerCase()));
+      const toAdd = DEFAULT_HEALTHCHECKS.filter(
+        (d) => !existing.has(d.name.toLowerCase()),
+      );
+      if (toAdd.length === 0) {
+        toastInfo("Ya tienes todos los healthchecks por defecto.");
+        return;
+      }
+      const added: ProjectHealthcheck[] = [];
+      for (let i = 0; i < toAdd.length; i++) {
+        const hc = await statusService.addHealthcheck(id as string, {
+          name: toAdd[i].name,
+          url: toAdd[i].url,
+          orderIndex: checks.length + i,
+        });
+        added.push(hc);
+      }
+      setChecks((prev) => [...prev, ...added]);
+      toastSuccess(`${added.length} healthcheck(s) añadidos`);
+    } catch (err) {
+      toastError(getErrorMessage(err));
+    } finally {
+      setAddingDefaults(false);
     }
   };
 
@@ -158,9 +199,20 @@ function HealthcheckConfigPage() {
       </div>
 
       {/* Healthchecks */}
-      <h2 className="mb-3 text-lg font-semibold text-white">
-        Endpoints ({checks.length})
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-white">
+          Endpoints ({checks.length})
+        </h2>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={addDefaults}
+          loading={addingDefaults}
+          title="Añade el set estándar de healthchecks (/api/healthz/...)"
+        >
+          + Set por defecto
+        </Button>
+      </div>
       <div className="mb-4 flex flex-col gap-2">
         {checks.map((c) => (
           <div
