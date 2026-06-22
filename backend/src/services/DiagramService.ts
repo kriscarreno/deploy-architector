@@ -14,6 +14,7 @@ import type { DiagramNodeRepository } from "../repositories/DiagramNodeRepositor
 import type { DiagramEdgeRepository } from "../repositories/DiagramEdgeRepository.js";
 import type { ProjectRepository } from "../repositories/ProjectRepository.js";
 import type { TeamRepository } from "../repositories/TeamRepository.js";
+import type { ProjectHealthcheckRepository } from "../repositories/ProjectHealthcheckRepository.js";
 import type {
   Diagram,
   DiagramEdge,
@@ -47,6 +48,7 @@ export class DiagramService {
   private edgeRepo: DiagramEdgeRepository;
   private projectRepo: ProjectRepository;
   private teamRepo: TeamRepository;
+  private hcRepo?: ProjectHealthcheckRepository;
 
   constructor(
     diagramRepo: DiagramRepository,
@@ -54,12 +56,14 @@ export class DiagramService {
     edgeRepo: DiagramEdgeRepository,
     projectRepo: ProjectRepository,
     teamRepo: TeamRepository,
+    hcRepo?: ProjectHealthcheckRepository,
   ) {
     this.diagramRepo = diagramRepo;
     this.nodeRepo = nodeRepo;
     this.edgeRepo = edgeRepo;
     this.projectRepo = projectRepo;
     this.teamRepo = teamRepo;
+    this.hcRepo = hcRepo;
   }
 
   // ── Diagrams ───────────────────────────────────────────────────────────────
@@ -94,9 +98,45 @@ export class DiagramService {
     userId: number,
   ): Promise<DiagramWithGraph> {
     const diagram = await this.assertAccess(diagramId, userId);
-    const nodes = await this.nodeRepo.findAllByDiagram(diagramId);
+    let nodes = await this.nodeRepo.findAllByDiagram(diagramId);
     const edges = await this.edgeRepo.findAllByDiagram(diagramId);
+
+    // Project nodes reflect the health of their project's healthchecks
+    nodes = await this.applyProjectHealth(nodes, userId);
+
     return { ...diagram, nodes, edges };
+  }
+
+  /**
+   * For nodes that reference a project, derive their status from that project's
+   * healthchecks (down if any down, up if any up, else the node's own status).
+   */
+  private async applyProjectHealth(
+    nodes: DiagramNode[],
+    userId: number,
+  ): Promise<DiagramNode[]> {
+    if (!this.hcRepo) return nodes;
+    const hasProjectNodes = nodes.some(
+      (n) => n.kind === "project" && n.project_id != null,
+    );
+    if (!hasProjectNodes) return nodes;
+
+    // projectId → aggregated status, from all checks the user can access
+    const rows = await this.hcRepo.findStatusesByUser(userId);
+    const agg = new Map<number, { up: number; down: number }>();
+    for (const r of rows) {
+      const e = agg.get(r.project_id) ?? { up: 0, down: 0 };
+      if (r.status === "up") e.up++;
+      else if (r.status === "down") e.down++;
+      agg.set(r.project_id, e);
+    }
+
+    return nodes.map((n) => {
+      if (n.kind !== "project" || n.project_id == null) return n;
+      const e = agg.get(n.project_id);
+      if (!e || e.up + e.down === 0) return n; // no checks → keep node's status
+      return { ...n, status: e.down > 0 ? "down" : "up" };
+    });
   }
 
   async updateDiagram(

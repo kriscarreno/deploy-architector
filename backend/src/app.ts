@@ -109,6 +109,7 @@ const diagramService = new DiagramService(
   diagramEdgeRepo,
   projectRepo,
   teamRepo,
+  healthcheckRepo,
 );
 const statusService = new StatusService(projectRepo, healthcheckRepo);
 
@@ -219,7 +220,16 @@ app.use("/api/projects", makeProjectRouter(projectCtrl, deployCtrl));
 app.use("/api/projects/:id/repos/:repoId/env", makeEnvVarRouter(envVarCtrl));
 app.use("/api/jobs", makeJobRouter(deployCtrl));
 app.use("/api/github", githubRoutes);
-app.use("/api/config", makeConfigRouter(projectRepo, repoRepo));
+app.use(
+  "/api/config",
+  makeConfigRouter(
+    projectRepo,
+    repoRepo,
+    envVarRepo,
+    repoEnvFileRepo,
+    healthcheckRepo,
+  ),
+);
 app.use("/api/teams", makeTeamRouter(teamCtrl));
 app.use("/api/diagrams", makeDiagramRouter(diagramCtrl));
 // Per-project healthcheck CRUD + config (authenticated, broad — registered last)

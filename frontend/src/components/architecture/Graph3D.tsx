@@ -36,7 +36,9 @@ function lucideSvgDataUrl(Icon: LucideIcon, color: string): string {
 /** Color de acento del nodo (borde de la tarjeta + material). */
 function accentColor(n: DiagramNode, highlighted: boolean): string {
   if (highlighted) return "#f59e0b";
-  if (n.healthcheck_url) return STATUS_COLOR[n.status] ?? STATUS_COLOR.unknown;
+  // Color por estado cuando se conoce (externos con healthcheck, o proyectos
+  // cuyo estado se deriva de sus healthchecks).
+  if (n.status === "up" || n.status === "down") return STATUS_COLOR[n.status];
   if (n.color) return n.color;
   return n.kind === "project" ? "#3b82f6" : "#a855f7";
 }
@@ -129,16 +131,17 @@ interface GraphLinkObj {
   edgeType?: string | null;
 }
 
-function buildLinkObject(link: GraphLinkObj): THREE.Object3D {
+// The forward (target) arrowhead uses react-force-graph's BUILT-IN directional
+// arrow (which animates together with the flow particles). We only add a custom
+// cone for the SOURCE end of bidirectional links. Returning false from
+// linkPositionUpdate keeps the library's default per-frame work — including the
+// moving particles — alive.
+function buildLinkObject(link: GraphLinkObj): THREE.Object3D | null {
+  if (!isBidirectional(link.edgeType)) return null;
   const group = new THREE.Group();
-  const end = makeArrowCone();
-  end.name = "arrowEnd";
-  group.add(end);
-  if (isBidirectional(link.edgeType)) {
-    const start = makeArrowCone();
-    start.name = "arrowStart";
-    group.add(start);
-  }
+  const start = makeArrowCone();
+  start.name = "arrowStart";
+  group.add(start);
   return group;
 }
 
@@ -156,34 +159,30 @@ function positionLinkArrows(
     end: { x: number; y: number; z: number };
   },
 ): boolean {
+  const startArrow = obj.getObjectByName("arrowStart");
+  if (!startArrow) return false; // let the library handle everything (particles!)
+
   const { start, end } = coords;
   _s.set(start.x, start.y, start.z);
   _e.set(end.x, end.y, end.z);
   _dir.subVectors(_e, _s);
   const len = _dir.length();
-  if (len === 0) return true;
+  if (len === 0) return false;
   _dir.multiplyScalar(1 / len);
 
-  const endArrow = obj.getObjectByName("arrowEnd");
-  if (endArrow) {
-    endArrow.position.set(
-      _e.x - _dir.x * NODE_RADIUS,
-      _e.y - _dir.y * NODE_RADIUS,
-      _e.z - _dir.z * NODE_RADIUS,
-    );
-    endArrow.quaternion.setFromUnitVectors(_up, _dir);
-  }
-  const startArrow = obj.getObjectByName("arrowStart");
-  if (startArrow) {
-    startArrow.position.set(
-      _s.x + _dir.x * NODE_RADIUS,
-      _s.y + _dir.y * NODE_RADIUS,
-      _s.z + _dir.z * NODE_RADIUS,
-    );
-    _rev.copy(_dir).negate();
-    startArrow.quaternion.setFromUnitVectors(_up, _rev);
-  }
-  return true;
+  // The library positions `obj` at the link's midpoint; place the cone relative
+  // to that midpoint, just inside the source node, pointing back toward it.
+  const mx = (_s.x + _e.x) / 2;
+  const my = (_s.y + _e.y) / 2;
+  const mz = (_s.z + _e.z) / 2;
+  startArrow.position.set(
+    _s.x + _dir.x * NODE_RADIUS - mx,
+    _s.y + _dir.y * NODE_RADIUS - my,
+    _s.z + _dir.z * NODE_RADIUS - mz,
+  );
+  _rev.copy(_dir).negate();
+  startArrow.quaternion.setFromUnitVectors(_up, _rev);
+  return false; // keep default positioning so particles keep flowing
 }
 
 /** Tarjeta (sprite) con icono lucide + nombre que siempre mira a la cámara. */
@@ -378,7 +377,7 @@ function Graph3D({
           showNavInfo={false}
           onEngineTick={decorateScene}
           nodeLabel={(n: GraphNodeObj) =>
-            n.node.healthcheck_url
+            n.node.status === "up" || n.node.status === "down"
               ? `${n.node.label} · ${n.node.status}`
               : n.node.label
           }
@@ -391,11 +390,12 @@ function Graph3D({
           linkThreeObjectExtend={true}
           linkThreeObject={(l: GraphLinkObj) => buildLinkObject(l)}
           linkPositionUpdate={positionLinkArrows}
-          linkDirectionalParticles={(l: GraphLinkObj) =>
-            isBidirectional(l.edgeType) ? 0 : 2
-          }
+          linkDirectionalArrowLength={5}
+          linkDirectionalArrowRelPos={1}
+          linkDirectionalArrowColor={() => "#cbd5e1"}
+          linkDirectionalParticles={2}
           linkDirectionalParticleWidth={2}
-          linkDirectionalParticleSpeed={0.006}
+          linkDirectionalParticleSpeed={0.008}
           onLinkClick={(l: GraphLinkObj) => onLinkClick?.(l.id)}
           onNodeClick={(n: GraphNodeObj) => onNodeClick?.(n.id)}
           onBackgroundClick={() => onBackgroundClick?.()}
