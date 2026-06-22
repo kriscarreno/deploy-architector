@@ -32,14 +32,19 @@ export function makeDeployController(deployService) {
     },
 
     async dispatchWorkflow(req, res) {
-      const { branch } = req.body;
+      const { branch, repoIds } = req.body ?? {};
       if (!branch || typeof branch !== "string" || !branch.trim()) {
         return res.status(400).json({ error: "branch is required" });
       }
+      const parsedRepoIds =
+        Array.isArray(repoIds) && repoIds.length > 0
+          ? repoIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+          : undefined;
       const results = await deployService.dispatchWorkflow(
         Number(req.params.id),
         req.user.id,
         branch.trim(),
+        parsedRepoIds,
       );
       res.json({ data: results });
     },

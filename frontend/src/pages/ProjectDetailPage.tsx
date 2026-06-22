@@ -743,6 +743,7 @@ function DispatchModal({
   isOpen: boolean;
   onClose: () => void;
   repos: {
+    id: number;
     name: string;
     github_url: string;
     main_branch: string;
@@ -755,29 +756,46 @@ function DispatchModal({
   const defaultBranch = repos[0]?.main_branch ?? "main";
   const [branch, setBranch] = useState(defaultBranch);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [results, setResults] = useState<
     { name: string; success: boolean; httpStatus: number }[] | null
   >(null);
   const { toastSuccess, toastError } = useToast();
 
-  // Reset when modal opens
+  // Reset when modal opens — todos los repos seleccionados por defecto
   useEffect(() => {
     if (isOpen) {
       setBranch(repos[0]?.main_branch ?? "main");
+      setSelected(new Set(repos.map((r) => r.id)));
       setResults(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  const toggle = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allSelected = selected.size === repos.length && repos.length > 0;
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(repos.map((r) => r.id)));
+
   const handleDispatch = async () => {
-    if (!branch.trim()) return;
+    if (!branch.trim() || selected.size === 0) return;
     setLoading(true);
     setResults(null);
     try {
-      const data = await deployService.dispatch(projectId, branch.trim());
+      const data = await deployService.dispatch(
+        projectId,
+        branch.trim(),
+        Array.from(selected),
+      );
       setResults(data);
       const allOk = data.every((r) => r.success);
-      if (allOk) toastSuccess("Workflow lanzado en todos los repos");
+      if (allOk) toastSuccess("Workflow lanzado en los repos seleccionados");
       else toastError("Algunos workflows fallaron — revisa los resultados");
     } catch (err) {
       toastError(getErrorMessage(err));
@@ -805,9 +823,9 @@ function DispatchModal({
             <Button
               onClick={handleDispatch}
               loading={loading}
-              disabled={loading || !branch.trim()}
+              disabled={loading || !branch.trim() || selected.size === 0}
             >
-              Lanzar workflow
+              Lanzar workflow ({selected.size})
             </Button>
           )}
         </>
@@ -854,25 +872,44 @@ function DispatchModal({
             </div>
 
             <div className="rounded-lg border border-dark-border bg-dark-surface p-3">
-              <p className="mb-2 text-xs font-semibold text-slate-400">
-                Workflows configurados por repo:
-              </p>
-              <div className="flex flex-col gap-1">
-                {repos.map((r, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-300 truncate">
-                      {r.name ?? r.github_url?.split("/").pop()}
-                    </span>
-                    <span className="text-slate-600">→</span>
-                    <span className="font-mono text-primary-300">
-                      main: .github/workflows/
-                      {r.main_workflow_file || "deploy.yml"}
-                      {" / "}
-                      prod: .github/workflows/
-                      {r.prod_workflow_file || "deploy.yml"}
-                    </span>
-                  </div>
-                ))}
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-400">
+                  Repos a desplegar:
+                </p>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-xs text-primary-400 hover:underline"
+                >
+                  {allSelected ? "Quitar todos" : "Seleccionar todos"}
+                </button>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {repos.map((r) => {
+                  const wf =
+                    branch === r.prod_branch
+                      ? r.prod_workflow_file || "deploy.yml"
+                      : r.main_workflow_file || "deploy.yml";
+                  return (
+                    <label
+                      key={r.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-dark-bg"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.id)}
+                        onChange={() => toggle(r.id)}
+                        className="h-4 w-4 flex-shrink-0"
+                      />
+                      <span className="truncate text-slate-200">
+                        {r.name ?? r.github_url?.split("/").pop()}
+                      </span>
+                      <span className="ml-auto truncate font-mono text-[11px] text-slate-500">
+                        .github/workflows/{wf}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           </>

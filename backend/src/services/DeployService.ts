@@ -147,14 +147,32 @@ export class DeployService {
    *
    * @returns Array of per-repo results { repoId, name, success, status }
    */
-  async dispatchWorkflow(projectId: number, userId: number, branch: string) {
+  async dispatchWorkflow(
+    projectId: number,
+    userId: number,
+    branch: string,
+    repoIds?: number[],
+  ) {
     const project = await this.projectRepo.findById(projectId);
     if (!project) throw new NotFoundError("Project not found");
 
     const member = await this.projectRepo.isMember(projectId, userId);
     if (!member) throw new ForbiddenError();
 
-    const repos = await this.repoRepo.findAllByProject(projectId);
+    let repos = await this.repoRepo.findAllByProject(projectId);
+
+    // Optional manual selection — deploy only the chosen repos
+    if (repoIds && repoIds.length > 0) {
+      const validIds = new Set(repos.map((r) => r.id));
+      const invalid = repoIds.filter((rid) => !validIds.has(rid));
+      if (invalid.length > 0)
+        throw new NotFoundError(
+          `Repos not found in project: ${invalid.join(", ")}`,
+        );
+      const selected = new Set(repoIds);
+      repos = repos.filter((r) => selected.has(r.id));
+    }
+
     const user = await this.userRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 

@@ -26,9 +26,12 @@ const deployService = {
    * @param {string} branch  Rama sobre la que ejecutar el workflow
    * @returns {Promise<Array<{ repoId: number; name: string; success: boolean; httpStatus: number }>>}
    */
-  dispatch(projectId, branch: string) {
+  dispatch(projectId, branch: string, repoIds?: number[]) {
     return apiClient
-      .post(`/api/projects/${projectId}/dispatch`, { branch })
+      .post(`/api/projects/${projectId}/dispatch`, {
+        branch,
+        ...(repoIds?.length ? { repoIds } : {}),
+      })
       .then((r) => r.data.data);
   },
 
