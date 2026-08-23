@@ -651,11 +651,22 @@ function SelectReposModal({
   onConfirm: (selectedIds: number[]) => void;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // "select" = elegir repos, "confirm" = ultima oportunidad de echarse atras
+  const [step, setStep] = useState<"select" | "confirm">("select");
 
-  // Select all by default when modal opens
+  // Select all by default when modal opens.
+  // Se depende del contenido, no de la identidad del array: `repos` se
+  // recrea en cada render y si no, este reset devolvería al paso 1 a
+  // media confirmación.
+  const repoIdsKey = repos.map((r) => r.id).join(",");
   useEffect(() => {
-    if (isOpen) setSelected(new Set(repos.map((r) => r.id)));
-  }, [isOpen, repos]);
+    if (isOpen) {
+      setSelected(new Set(repos.map((r) => r.id)));
+      // Nunca reabrir directamente en la pantalla de confirmación
+      setStep("select");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, repoIdsKey]);
 
   const toggle = (id: number) => {
     setSelected((prev) => {
@@ -678,6 +689,59 @@ function SelectReposModal({
     onClose();
   };
 
+  const selectedRepos = repos.filter((r) => selected.has(r.id));
+
+  if (step === "confirm") {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="¿Seguro que quieres desplegar?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setStep("select")}>
+              Volver
+            </Button>
+            <Button variant="danger" onClick={handleConfirm}>
+              Sí, desplegar ({selected.size})
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-slate-300">
+            Vas a desplegar{" "}
+            <span className="font-semibold text-white">
+              {selected.size} repositorio{selected.size !== 1 ? "s" : ""}
+            </span>{" "}
+            a producción.
+          </p>
+
+          <div className="flex items-start gap-3 rounded-lg border border-amber-800/60 bg-amber-900/20 px-4 py-3">
+            <span aria-hidden="true" className="text-lg leading-none">
+              ⚠️
+            </span>
+            <p className="text-sm font-semibold text-amber-300">
+              ¿Le preguntaste a Fer?
+            </p>
+          </div>
+
+          <ul className="flex flex-col gap-1.5">
+            {selectedRepos.map((repo) => (
+              <li
+                key={repo.id}
+                className="flex items-center gap-2 text-sm text-slate-300"
+              >
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-500" />
+                <span className="truncate">{repo.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       isOpen={isOpen}
@@ -688,7 +752,10 @@ function SelectReposModal({
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={selected.size === 0}>
+          <Button
+            onClick={() => setStep("confirm")}
+            disabled={selected.size === 0}
+          >
             Desplegar ({selected.size})
           </Button>
         </>
