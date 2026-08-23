@@ -302,6 +302,14 @@ export function makeProjectController(projectService) {
       res.json({ data: results });
     },
 
+    async getSyncSummary(req, res) {
+      const summary = await projectService.getSyncSummary(
+        req.user.id,
+        req.user.access_token,
+      );
+      res.json({ data: summary });
+    },
+
     async getProjectDiff(req, res) {
       const diffs = await projectService.getRepoDiffs(
         Number(req.params.id),

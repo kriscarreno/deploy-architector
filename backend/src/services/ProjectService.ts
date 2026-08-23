@@ -13,7 +13,21 @@ import type { RepoRepository } from "../repositories/RepoRepository.js";
 import type { RepoEnvFileRepository } from "../repositories/RepoEnvFileRepository.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 import { cloneOrFetch, getDiffSummary } from "../utils/gitHelper.js";
+import { compareBranches } from "../utils/githubApi.js";
+import { getCached, setCached } from "../utils/syncCache.js";
 import { scheduler } from "../config/scheduler.js";
+
+/** Per-project roll-up of how far `main` is ahead of `production`. */
+export interface ProjectSyncSummary {
+  projectId: number;
+  repoCount: number;
+  /** Repos with at least one commit waiting to be merged into production. */
+  pendingRepos: number;
+  /** Total commits across those repos. */
+  aheadCommits: number;
+  /** Repos whose comparison could not be resolved (missing branch, no access…). */
+  unknownRepos: number;
+}
 
 export class ProjectService {
   private projectRepo: ProjectRepository;
@@ -132,6 +146,62 @@ export class ProjectService {
     );
 
     return results;
+  }
+
+  /**
+   * Cheap "is there anything to deploy?" roll-up for every project the user
+   * can see. Uses the GitHub compare API instead of cloning, so it's fast
+   * enough for the projects list; results are cached per user for a minute.
+   */
+  async getSyncSummary(
+    userId: number,
+    accessToken: string,
+  ): Promise<ProjectSyncSummary[]> {
+    const cached = getCached<ProjectSyncSummary[]>(userId);
+    if (cached) return cached;
+
+    const projects = await this.projectRepo.findAllByUser(userId);
+
+    const summaries = await Promise.all(
+      projects.map(async (project) => {
+        const repos = await this.repoRepo.findAllByProject(project.id);
+
+        const comparisons = await Promise.all(
+          repos.map((repo) =>
+            compareBranches(
+              repo.github_url,
+              repo.prod_branch,
+              repo.main_branch,
+              accessToken,
+            ),
+          ),
+        );
+
+        let pendingRepos = 0;
+        let aheadCommits = 0;
+        let unknownRepos = 0;
+
+        for (const comparison of comparisons) {
+          if (!comparison) {
+            unknownRepos++;
+          } else if (comparison.aheadBy > 0) {
+            pendingRepos++;
+            aheadCommits += comparison.aheadBy;
+          }
+        }
+
+        return {
+          projectId: project.id,
+          repoCount: repos.length,
+          pendingRepos,
+          aheadCommits,
+          unknownRepos,
+        };
+      }),
+    );
+
+    setCached(userId, summaries);
+    return summaries;
   }
 
   async updateCronConfig(

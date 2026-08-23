@@ -18,12 +18,23 @@ export const JOB_STATUS = {
   FAILED: "failed",
 };
 
-function useDeploy(projectId) {
+/**
+ * @param projectId  Proyecto sobre el que se despliega.
+ * @param onFinished Se invoca al cerrar el job ('success' | 'failed'). Pensado
+ *   para que la vista refresque su estado sin que el usuario recargue.
+ */
+function useDeploy(projectId, onFinished?: (status: string) => void) {
   const [status, setStatus] = useState(JOB_STATUS.IDLE);
   const [jobId, setJobId] = useState<string | null>(null);
   const [streamLines, setStreamLines] = useState<string[]>([]);
   const esRef = useRef<EventSource | null>(null);
   const { toastSuccess, toastError } = useToast();
+
+  // Guardado en una ref para que cambiar el callback no reabra el SSE.
+  const onFinishedRef = useRef(onFinished);
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   const isDeploying =
     status === JOB_STATUS.PENDING || status === JOB_STATUS.RUNNING;
@@ -53,7 +64,9 @@ function useDeploy(projectId) {
         if (payload.type === "log" && payload.line) {
           setStreamLines((prev) => [...prev, payload.line!]);
         } else if (payload.type === "done") {
-          if (payload.status === "success") {
+          const finalStatus =
+            payload.status === "success" ? JOB_STATUS.SUCCESS : JOB_STATUS.FAILED;
+          if (finalStatus === JOB_STATUS.SUCCESS) {
             setStatus(JOB_STATUS.SUCCESS);
             toastSuccess("¡Despliegue completado con éxito!");
           } else {
@@ -62,6 +75,9 @@ function useDeploy(projectId) {
           }
           es.close();
           esRef.current = null;
+          // Incluso al fallar el estado puede haber cambiado (deploy parcial
+          // multi-repo), así que avisamos siempre.
+          onFinishedRef.current?.(finalStatus);
         }
       } catch (_) {}
     };
