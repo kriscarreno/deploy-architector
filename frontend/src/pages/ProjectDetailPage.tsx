@@ -1659,7 +1659,15 @@ function ProjectDetailPage() {
     clearSelectedProject,
   } = useProjectStore();
 
-  const { deploy, status, streamLines, isDeploying, reset } = useDeploy(id);
+  // Al terminar el deploy refrescamos proyecto y diff para que la columna
+  // "Sincronización" y el panel de diff reflejen el nuevo estado sin recargar.
+  const { deploy, status, streamLines, isDeploying, reset } = useDeploy(
+    id,
+    () => {
+      fetchProject(id);
+      checkDiff(true);
+    },
+  );
 
   type RepoDiff = {
     repoId: number;

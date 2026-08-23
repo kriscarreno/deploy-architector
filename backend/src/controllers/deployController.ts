@@ -6,6 +6,7 @@
  */
 import Joi from "joi";
 import { createSubscriber, deployChannel } from "../config/redisSub.js";
+import { invalidate as invalidateSyncCache } from "../utils/syncCache.js";
 
 const paginationSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
@@ -116,6 +117,7 @@ export function makeDeployController(deployService) {
                 send({ type: "log", line });
               }
             }
+            invalidateSyncCache(userId);
             send({ type: "done", status: logEntry.status });
             res.end();
             return;
@@ -138,6 +140,8 @@ export function makeDeployController(deployService) {
               if (!res.writableEnded) res.write(`data: ${message}\n\n`);
               const parsed = JSON.parse(message) as { type: string };
               if (parsed.type === "done") {
+                // Branches moved — the cached sync summary is now stale
+                invalidateSyncCache(userId);
                 sub.disconnect();
                 if (!res.writableEnded) res.end();
               }

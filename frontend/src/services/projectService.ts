@@ -100,6 +100,24 @@ const projectService = {
   },
 
   /**
+   * Resumen de sincronización de todos los proyectos: cuántos repos tienen
+   * commits pendientes de mergear a producción.
+   * Usa la API de comparación de GitHub (sin clonar), así que es rápido.
+   */
+  getSyncSummary() {
+    return apiClient.get("/api/projects/sync-summary").then(
+      (r) =>
+        r.data.data as Array<{
+          projectId: number;
+          repoCount: number;
+          pendingRepos: number;
+          aheadCommits: number;
+          unknownRepos: number;
+        }>,
+    );
+  },
+
+  /**
    * Guarda la configuración de despliegue programado del proyecto.
    */
   updateCron(

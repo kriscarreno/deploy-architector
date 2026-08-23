@@ -29,6 +29,9 @@ export function makeProjectRouter(projectCtrl, deployCtrl) {
   router.get("/", asyncHandler(projectCtrl.listProjects));
   router.post("/", asyncHandler(projectCtrl.createProject));
 
+  // Must be declared before "/:id" — otherwise the param route swallows it
+  router.get("/sync-summary", asyncHandler(projectCtrl.getSyncSummary));
+
   router.get("/:id", asyncHandler(projectCtrl.getProject));
   router.put("/:id", asyncHandler(projectCtrl.updateProject));
   router.delete("/:id", asyncHandler(projectCtrl.deleteProject));

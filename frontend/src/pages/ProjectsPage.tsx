@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import useProjects from "../hooks/useProjects";
+import projectService from "../services/projectService";
 import Button from "../components/common/Button";
 import Modal from "../components/common/Modal";
 import Input from "../components/common/Input";
@@ -22,15 +23,80 @@ interface CreateProjectForm {
 }
 
 // ── Tarjeta de proyecto ───────────────────────────────────────────────────
+interface SyncSummary {
+  projectId: number;
+  repoCount: number;
+  pendingRepos: number;
+  aheadCommits: number;
+  unknownRepos: number;
+}
+
+/** Badge «pendiente de mergear» / «al día» para la card de proyecto. */
+function SyncBadge({
+  sync,
+  loading,
+}: {
+  sync: SyncSummary | undefined;
+  loading: boolean;
+}) {
+  if (loading && !sync) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-500" />
+        Verificando…
+      </span>
+    );
+  }
+
+  if (!sync || sync.repoCount === 0) return null;
+
+  // Ningún repo se pudo comparar (token caducado, rama inexistente, sin
+  // acceso…). No decimos "Al día" — sería mentira; lo marcamos como tal.
+  if (sync.unknownRepos === sync.repoCount) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-400"
+        title="No se pudo comparar con GitHub. Puede que la sesión haya caducado o que la rama de producción no exista."
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+        Sin verificar
+      </span>
+    );
+  }
+
+  if (sync.pendingRepos === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-900/40 px-2 py-0.5 text-xs font-medium text-green-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+        Al día
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-400"
+      title={`${sync.aheadCommits} commit(s) sin mergear a producción`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      {sync.pendingRepos} repo{sync.pendingRepos !== 1 ? "s" : ""} ·{" "}
+      {sync.aheadCommits} commit{sync.aheadCommits !== 1 ? "s" : ""} pendiente
+      {sync.aheadCommits !== 1 ? "s" : ""}
+    </span>
+  );
+}
+
 const ProjectCard = memo(function ProjectCard({
   project,
-  status,
+  sync,
+  syncLoading,
   onClick,
   onEdit,
   onDelete,
 }: {
   project: Project;
-  status?: HealthStatus;
+  sync: SyncSummary | undefined;
+  syncLoading: boolean;
   onClick: () => void;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
@@ -120,24 +186,8 @@ const ProjectCard = memo(function ProjectCard({
         )}
       </div>
 
-      {/* Acciones rápidas — no propagar para no abrir el detalle dos veces */}
-      <div
-        className="mt-3 flex flex-wrap gap-1.5 border-t border-dark-border pt-3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {[
-          { to: `/projects/${project.id}`, label: "Detalle" },
-          { to: `/projects/${project.id}/status`, label: "Estado" },
-          { to: `/projects/${project.id}/healthchecks`, label: "Healthchecks" },
-        ].map((a) => (
-          <Link
-            key={a.label}
-            to={a.to}
-            className="rounded-md bg-dark-bg px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-dark-border hover:text-white"
-          >
-            {a.label}
-          </Link>
-        ))}
+      <div className="mt-3 min-h-[20px]">
+        <SyncBadge sync={sync} loading={syncLoading} />
       </div>
     </article>
   );
@@ -364,6 +414,35 @@ function ProjectsPage() {
   const health = useHealthSummary();
   const navigate = useNavigate();
 
+  // Resumen de sincronización — se pide en segundo plano para no bloquear
+  // el render de las cards, que aparecen en cuanto llega la lista.
+  const [syncByProject, setSyncByProject] = useState<
+    Record<number, SyncSummary>
+  >({});
+  const [syncLoading, setSyncLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSyncLoading(true);
+    projectService
+      .getSyncSummary()
+      .then((summaries) => {
+        if (cancelled) return;
+        setSyncByProject(
+          Object.fromEntries(summaries.map((s) => [s.projectId, s])),
+        );
+      })
+      .catch(() => {
+        // Silencioso: el badge simplemente no aparece, no molestamos con toast
+      })
+      .finally(() => {
+        if (!cancelled) setSyncLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleEdit = async (data: CreateProjectForm) => {
     if (!editProject) return;
     await updateProject(String(editProject.id), data);
@@ -441,6 +520,8 @@ function ProjectsPage() {
             <ProjectCard
               key={p.id}
               project={p}
+              sync={syncByProject[p.id]}
+              syncLoading={syncLoading}
               status={health[p.id]}
               onClick={() => navigate(`/projects/${p.id}`)}
               onEdit={(e) => {
